@@ -86,7 +86,7 @@ module.exports = ({ strapi }) => ({
     const pluginStore = strapi.store({
       environment: '',
       type: 'plugin',
-      name: 'deepl-translate',
+      name: 'strapi-localize',
     });
 
     const settings = await pluginStore.get({ key: 'settings' });
@@ -136,7 +136,7 @@ module.exports = ({ strapi }) => ({
     }
 
     // Get glossary ID for the language pair
-    const settingsService = strapi.plugin('deepl-translate').service('settings');
+    const settingsService = strapi.plugin('strapi-localize').service('settings');
     const settings = await settingsService.getSettings();
     const glossaryIds = settings.glossaryIds || {};
 
@@ -214,7 +214,7 @@ module.exports = ({ strapi }) => ({
     const pluginStore = strapi.store({
       environment: '',
       type: 'plugin',
-      name: 'deepl-translate',
+      name: 'strapi-localize',
     });
 
     const settings = await pluginStore.get({ key: 'settings' });
@@ -340,7 +340,7 @@ module.exports = ({ strapi }) => ({
   },
 
   async syncGlossaries() {
-    const settingsService = strapi.plugin('deepl-translate').service('settings');
+    const settingsService = strapi.plugin('strapi-localize').service('settings');
     const settings = await settingsService.getSettings();
     const glossary = settings.glossary || [];
 

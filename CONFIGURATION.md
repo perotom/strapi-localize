@@ -8,9 +8,9 @@ Create or update `config/plugins.js`:
 
 ```javascript
 module.exports = {
-  'strapi-deepl-translate': {
+  'strapi-localize': {
     enabled: true,
-    resolve: './src/plugins/strapi-deepl-translate'
+    resolve: './src/plugins/strapi-localize'
   },
 };
 ```

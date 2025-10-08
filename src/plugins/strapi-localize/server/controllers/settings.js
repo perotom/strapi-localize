@@ -4,7 +4,7 @@ module.exports = ({ strapi }) => ({
   async get(ctx) {
     try {
       const settings = await strapi
-        .plugin('deepl-translate')
+        .plugin('strapi-localize')
         .service('settings')
         .getSettings();
 
@@ -89,7 +89,7 @@ module.exports = ({ strapi }) => ({
       }
 
       const settings = await strapi
-        .plugin('deepl-translate')
+        .plugin('strapi-localize')
         .service('settings')
         .updateSettings(newSettings);
 
@@ -97,7 +97,7 @@ module.exports = ({ strapi }) => ({
       if (settings.glossary && settings.glossary.length > 0) {
         try {
           await strapi
-            .plugin('deepl-translate')
+            .plugin('strapi-localize')
             .service('deepl')
             .syncGlossaries();
         } catch (glossaryError) {
@@ -154,7 +154,7 @@ module.exports = ({ strapi }) => ({
   async testConnection(ctx) {
     try {
       const languages = await strapi
-        .plugin('deepl-translate')
+        .plugin('strapi-localize')
         .service('deepl')
         .getAvailableLanguages();
 
@@ -173,7 +173,7 @@ module.exports = ({ strapi }) => ({
   async syncGlossaries(ctx) {
     try {
       const glossaryIds = await strapi
-        .plugin('deepl-translate')
+        .plugin('strapi-localize')
         .service('deepl')
         .syncGlossaries();
 
@@ -193,7 +193,7 @@ module.exports = ({ strapi }) => ({
   async listGlossaries(ctx) {
     try {
       const glossaries = await strapi
-        .plugin('deepl-translate')
+        .plugin('strapi-localize')
         .service('deepl')
         .listGlossaries();
 

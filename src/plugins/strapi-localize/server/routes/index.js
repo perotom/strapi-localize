@@ -14,7 +14,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.settings.read'],
+                actions: ['plugin::strapi-localize.settings.read'],
               },
             },
           ],
@@ -30,7 +30,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.settings.update'],
+                actions: ['plugin::strapi-localize.settings.update'],
               },
             },
           ],
@@ -46,7 +46,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.settings.read'],
+                actions: ['plugin::strapi-localize.settings.read'],
               },
             },
           ],
@@ -62,7 +62,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.settings.read'],
+                actions: ['plugin::strapi-localize.settings.read'],
               },
             },
           ],
@@ -78,7 +78,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.translate'],
+                actions: ['plugin::strapi-localize.translate'],
               },
             },
           ],
@@ -94,7 +94,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.translate'],
+                actions: ['plugin::strapi-localize.translate'],
               },
             },
           ],
@@ -110,7 +110,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.settings.read'],
+                actions: ['plugin::strapi-localize.settings.read'],
               },
             },
           ],
@@ -126,7 +126,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.settings.update'],
+                actions: ['plugin::strapi-localize.settings.update'],
               },
             },
           ],
@@ -142,7 +142,7 @@ module.exports = {
             {
               name: 'admin::hasPermissions',
               config: {
-                actions: ['plugin::deepl-translate.settings.read'],
+                actions: ['plugin::strapi-localize.settings.read'],
               },
             },
           ],

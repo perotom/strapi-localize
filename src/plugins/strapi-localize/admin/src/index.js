@@ -2,7 +2,7 @@ import { prefixPluginTranslations } from '@strapi/helper-plugin';
 import pluginId from './pluginId';
 import PluginIcon from './components/PluginIcon';
 
-const name = 'deepl-translate';
+const name = 'strapi-localize';
 
 export default {
   register(app) {

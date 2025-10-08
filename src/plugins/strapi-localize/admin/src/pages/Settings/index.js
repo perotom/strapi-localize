@@ -60,7 +60,7 @@ const Settings = () => {
 
   const fetchSettings = async () => {
     try {
-      const data = await get('/deepl-translate/settings');
+      const data = await get('/strapi-localize/settings');
       setSettings(data.data || data);
     } catch (error) {
       toggleNotification({
@@ -72,7 +72,7 @@ const Settings = () => {
 
   const fetchContentTypes = async () => {
     try {
-      const data = await get('/deepl-translate/content-types');
+      const data = await get('/strapi-localize/content-types');
       setContentTypes(data.data || data);
       setIsLoading(false);
     } catch (error) {
@@ -87,7 +87,7 @@ const Settings = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await put('/deepl-translate/settings', settings);
+      await put('/strapi-localize/settings', settings);
       toggleNotification({
         type: 'success',
         message: 'Settings saved successfully',
@@ -104,7 +104,7 @@ const Settings = () => {
   const handleTestConnection = async () => {
     setIsTestingConnection(true);
     try {
-      const response = await post('/deepl-translate/test-connection');
+      const response = await post('/strapi-localize/test-connection');
       const data = response.data || response;
       setConnectionStatus(data.success);
       if (data.success) {
@@ -211,7 +211,7 @@ const Settings = () => {
     setGlossarySyncStatus(null);
 
     try {
-      const response = await post('/deepl-translate/sync-glossaries');
+      const response = await post('/strapi-localize/sync-glossaries');
       const data = response.data || response;
 
       if (data.success) {

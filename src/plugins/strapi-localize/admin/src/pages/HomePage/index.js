@@ -52,7 +52,7 @@ const HomePage = () => {
 
   const fetchContentTypes = async () => {
     try {
-      const data = await get('/deepl-translate/content-types');
+      const data = await get('/strapi-localize/content-types');
       const types = data.data || data;
       setContentTypes(types);
       if (types.length > 0) {
@@ -110,7 +110,7 @@ const HomePage = () => {
 
     setIsTranslating(true);
     try {
-      await post('/deepl-translate/translate-batch', {
+      await post('/strapi-localize/translate-batch', {
         ids: selectedEntities,
         model: selectedContentType,
         targetLocale,

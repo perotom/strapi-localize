@@ -5,7 +5,7 @@ module.exports = ({ strapi }) => {
     const { model, data, where } = event.params;
 
     const settings = await strapi
-      .plugin('deepl-translate')
+      .plugin('strapi-localize')
       .service('settings')
       .getSettings();
 
@@ -41,7 +41,7 @@ module.exports = ({ strapi }) => {
 
       try {
         await strapi
-          .plugin('deepl-translate')
+          .plugin('strapi-localize')
           .service('deepl')
           .translateContent(where.id, model.uid, targetLocale.code, currentLocale);
 

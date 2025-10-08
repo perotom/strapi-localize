@@ -24,14 +24,14 @@ A powerful Strapi v5 plugin that automatically translates your content using the
 ### From NPM (when published)
 
 ```bash
-npm install strapi-deepl-translate
+npm install strapi-localize
 ```
 
 ### From Source
 
 1. Copy the plugin folder to your Strapi project:
 ```bash
-cp -r strapi-deepl-translate /path/to/your-strapi-project/src/plugins/
+cp -r strapi-localize /path/to/your-strapi-project/src/plugins/
 ```
 
 2. Install dependencies:
@@ -44,9 +44,9 @@ npm install axios
 
 ```javascript
 module.exports = {
-  'strapi-deepl-translate': {
+  'strapi-localize': {
     enabled: true,
-    resolve: './src/plugins/strapi-deepl-translate'
+    resolve: './src/plugins/strapi-localize'
   },
 };
 ```
@@ -91,19 +91,19 @@ The plugin implements role-based access control (RBAC) for all operations:
 
 #### Permission Actions
 
-1. **`plugin::deepl-translate.settings.read`**
+1. **`plugin::strapi-localize.settings.read`**
    - View plugin settings
    - Test API connection
    - List available languages
    - View content types
 
-2. **`plugin::deepl-translate.settings.update`**
+2. **`plugin::strapi-localize.settings.update`**
    - Modify plugin configuration
    - Update API key
    - Change content type settings
    - Sync glossaries
 
-3. **`plugin::deepl-translate.translate`**
+3. **`plugin::strapi-localize.translate`**
    - Perform single translations
    - Execute batch translations
 
@@ -239,7 +239,7 @@ When enabled, the plugin automatically translates content:
     "title": {
       "type": "string",
       "pluginOptions": {
-        "deepl-translate": {
+        "strapi-localize": {
           "translatable": true
         }
       }
@@ -247,7 +247,7 @@ When enabled, the plugin automatically translates content:
     "slug": {
       "type": "string",
       "pluginOptions": {
-        "deepl-translate": {
+        "strapi-localize": {
           "translatable": false // Never translate this field
         }
       }
@@ -263,7 +263,7 @@ When enabled, the plugin automatically translates content:
 #### Translate Single Content
 
 ```http
-POST /api/deepl-translate/translate
+POST /api/strapi-localize/translate
 Authorization: Bearer YOUR_JWT_TOKEN
 Content-Type: application/json
 
@@ -289,7 +289,7 @@ Content-Type: application/json
 #### Batch Translation
 
 ```http
-POST /api/deepl-translate/translate-batch
+POST /api/strapi-localize/translate-batch
 Authorization: Bearer YOUR_JWT_TOKEN
 Content-Type: application/json
 
@@ -313,7 +313,7 @@ Content-Type: application/json
 #### Get Available Languages
 
 ```http
-GET /api/deepl-translate/languages
+GET /api/strapi-localize/languages
 Authorization: Bearer YOUR_JWT_TOKEN
 ```
 
@@ -330,8 +330,8 @@ Authorization: Bearer YOUR_JWT_TOKEN
 #### Get/Update Settings
 
 ```http
-GET /api/deepl-translate/settings
-PUT /api/deepl-translate/settings
+GET /api/strapi-localize/settings
+PUT /api/strapi-localize/settings
 Authorization: Bearer YOUR_JWT_TOKEN
 ```
 
@@ -339,7 +339,7 @@ Authorization: Bearer YOUR_JWT_TOKEN
 
 ```javascript
 // In your custom code
-const translationService = strapi.plugin('deepl-translate').service('deepl');
+const translationService = strapi.plugin('strapi-localize').service('deepl');
 
 // Translate a single field
 const translatedText = await translationService.translate(
@@ -458,7 +458,7 @@ module.exports = {
 ```javascript
 // config/plugins.js
 module.exports = {
-  'strapi-deepl-translate': {
+  'strapi-localize': {
     enabled: true,
     config: {
       batchSize: 25,        // Items per batch
@@ -491,7 +491,7 @@ Enable debug logging:
 ```javascript
 // config/plugins.js
 {
-  'strapi-deepl-translate': {
+  'strapi-localize': {
     enabled: true,
     config: {
       debug: true // Enable detailed logging
@@ -504,10 +504,10 @@ Enable debug logging:
 
 ```bash
 # Check plugin status
-curl http://localhost:1337/api/deepl-translate/health
+curl http://localhost:1337/api/strapi-localize/health
 
 # Test API connection
-curl -X POST http://localhost:1337/api/deepl-translate/test-connection \
+curl -X POST http://localhost:1337/api/strapi-localize/test-connection \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -525,7 +525,7 @@ const oldTranslations = await strapi
 // Import to DeepL Translate
 for (const item of oldTranslations) {
   await strapi
-    .plugin('deepl-translate')
+    .plugin('strapi-localize')
     .service('deepl')
     .translateContent(
       item.id,
@@ -544,7 +544,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Clone the repository
-git clone https://github.com/perotom/strapi-deepl-translate.git
+git clone https://github.com/perotom/strapi-localize.git
 
 # Install dependencies
 npm install
@@ -562,8 +562,8 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/perotom/strapi-deepl-translate/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/perotom/strapi-deepl-translate/discussions)
+- **Issues**: [GitHub Issues](https://github.com/perotom/strapi-localize/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/perotom/strapi-localize/discussions)
 - **Discord**: [Strapi Community](https://discord.strapi.io/)
 
 ## 🚦 Roadmap

@@ -1,12 +1,12 @@
 {
-  "name": "strapi-deepl-translate",
+  "name": "strapi-localize",
   "version": "1.0.0",
   "description": "Strapi v5 plugin for automatic content translation using DeepL API",
   "strapi": {
-    "name": "deepl-translate",
+    "name": "strapi-localize",
     "description": "Automatic content translation with DeepL",
     "kind": "plugin",
-    "displayName": "DeepL Translate"
+    "displayName": "Strapi Localize"
   },
   "scripts": {
     "test": "jest",

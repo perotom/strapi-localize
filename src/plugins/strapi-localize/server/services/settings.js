@@ -63,7 +63,7 @@ module.exports = ({ strapi }) => ({
     const pluginStore = strapi.store({
       environment: '',
       type: 'plugin',
-      name: 'deepl-translate',
+      name: 'strapi-localize',
     });
 
     const settings = await pluginStore.get({ key: 'settings' });
@@ -89,7 +89,7 @@ module.exports = ({ strapi }) => ({
     const pluginStore = strapi.store({
       environment: '',
       type: 'plugin',
-      name: 'deepl-translate',
+      name: 'strapi-localize',
     });
 
     // Encrypt API key before storing

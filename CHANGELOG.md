@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the strapi-deepl-translate plugin will be documented in this file.
+All notable changes to the strapi-localize plugin will be documented in this file.
 
 ## [1.0.0] - 2024-10-08
 
@@ -14,9 +14,9 @@ All notable changes to the strapi-deepl-translate plugin will be documented in t
   - See `SECURITY.md` for details
 
 - **Authentication & Authorization**: Role-based access control for all endpoints
-  - `plugin::deepl-translate.settings.read` - View settings
-  - `plugin::deepl-translate.settings.update` - Modify settings
-  - `plugin::deepl-translate.translate` - Perform translations
+  - `plugin::strapi-localize.settings.read` - View settings
+  - `plugin::strapi-localize.settings.update` - Modify settings
+  - `plugin::strapi-localize.translate` - Perform translations
   - All routes protected with `admin::isAuthenticatedAdmin`
   - Configurable via Strapi Admin Panel > Roles
 
@@ -115,7 +115,7 @@ All notable changes to the strapi-deepl-translate plugin will be documented in t
    ```javascript
    // config/plugins.js - REMOVE this if present:
    module.exports = {
-     'strapi-deepl-translate': {
+     'strapi-localize': {
        enabled: true,
        config: {
          apiKey: process.env.DEEPL_API_KEY, // ❌ No longer supported
@@ -125,9 +125,9 @@ All notable changes to the strapi-deepl-translate plugin will be documented in t
 
    // Use this instead:
    module.exports = {
-     'strapi-deepl-translate': {
+     'strapi-localize': {
        enabled: true,
-       resolve: './src/plugins/strapi-deepl-translate'
+       resolve: './src/plugins/strapi-localize'
      },
    };
    ```
@@ -159,7 +159,7 @@ All notable changes to the strapi-deepl-translate plugin will be documented in t
 
 6. **Install Dependencies**
    ```bash
-   cd src/plugins/strapi-deepl-translate
+   cd src/plugins/strapi-localize
    npm install
    ```
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the security features implemented in the strapi-deepl-translate plugin.
+This document describes the security features implemented in the strapi-strapi-localize plugin.
 
 ## 1. Authentication & Authorization
 
@@ -14,9 +14,9 @@ All API endpoints are now protected with Strapi's built-in authentication and pe
 - `admin::hasPermissions` - Checks for specific plugin permissions
 
 **Permission Actions:**
-- `plugin::deepl-translate.settings.read` - View settings
-- `plugin::deepl-translate.settings.update` - Modify settings
-- `plugin::deepl-translate.translate` - Perform translations
+- `plugin::strapi-localize.settings.read` - View settings
+- `plugin::strapi-localize.settings.update` - Modify settings
+- `plugin::strapi-localize.translate` - Perform translations
 
 ### Configuration
 Permissions can be managed through:
@@ -139,7 +139,7 @@ Basic unit tests are provided for:
 
 ### Running Tests
 ```bash
-cd src/plugins/strapi-deepl-translate
+cd src/plugins/strapi-strapi-localize
 npm install
 npm test
 npm run test:coverage

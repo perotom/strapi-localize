@@ -87,7 +87,7 @@ module.exports = ({ strapi }) => ({
       }
 
       const result = await strapi
-        .plugin('deepl-translate')
+        .plugin('strapi-localize')
         .service('deepl')
         .translateContent(id, model, targetLocale, sourceLocale);
 
@@ -153,7 +153,7 @@ module.exports = ({ strapi }) => ({
       const results = await Promise.allSettled(
         ids.map(id =>
           strapi
-            .plugin('deepl-translate')
+            .plugin('strapi-localize')
             .service('deepl')
             .translateContent(id, model, targetLocale, sourceLocale)
             .catch(error => ({
@@ -209,7 +209,7 @@ module.exports = ({ strapi }) => ({
   async getLanguages(ctx) {
     try {
       const languages = await strapi
-        .plugin('deepl-translate')
+        .plugin('strapi-localize')
         .service('deepl')
         .getAvailableLanguages();
 
