@@ -1,5 +1,5 @@
 {
-  "strapi-localize.plugin.name": "DeepL Translate",
+  "strapi-localize.plugin.name": "Strapi Localize",
   "strapi-localize.settings.title": "Settings",
   "strapi-localize.settings.apiKey": "DeepL API Key",
   "strapi-localize.settings.apiKey.hint": "Enter your DeepL API key (Free or Pro)",
@@ -18,7 +18,7 @@
   "strapi-localize.settings.connectionFailed": "Connection failed",
   "strapi-localize.settings.noContentTypes": "No localizable content types found",
   "strapi-localize.settings.noContentTypes.description": "Please ensure you have content types with i18n enabled",
-  "strapi-localize.home.title": "DeepL Translate",
+  "strapi-localize.home.title": "Strapi Localize",
   "strapi-localize.home.batchTranslation": "Batch Translation",
   "strapi-localize.home.contentType": "Content Type",
   "strapi-localize.home.targetLanguage": "Target Language",

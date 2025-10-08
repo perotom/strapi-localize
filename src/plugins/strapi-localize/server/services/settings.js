@@ -26,10 +26,12 @@ module.exports = ({ strapi }) => ({
       let encrypted = cipher.update(apiKey, 'utf8', 'hex');
       encrypted += cipher.final('hex');
 
+      strapi.log.debug('[Strapi Localize] API key encrypted successfully');
+
       // Store IV with encrypted data (IV doesn't need to be secret)
       return `${iv.toString('hex')}:${encrypted}`;
     } catch (error) {
-      strapi.log.error('Failed to encrypt API key:', error.message);
+      strapi.log.error(`[Strapi Localize] Failed to encrypt API key: ${error.message}`);
       throw new Error('Failed to encrypt API key');
     }
   },
@@ -41,6 +43,7 @@ module.exports = ({ strapi }) => ({
       // Check if already encrypted (contains IV separator)
       if (!encryptedApiKey.includes(':')) {
         // Legacy unencrypted key - encrypt it on next save
+        strapi.log.warn('[Strapi Localize] Detected legacy unencrypted API key, will be encrypted on next save');
         return encryptedApiKey;
       }
 
@@ -52,9 +55,11 @@ module.exports = ({ strapi }) => ({
       let decrypted = decipher.update(encrypted, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
 
+      strapi.log.debug('[Strapi Localize] API key decrypted successfully');
+
       return decrypted;
     } catch (error) {
-      strapi.log.error('Failed to decrypt API key:', error.message);
+      strapi.log.error(`[Strapi Localize] Failed to decrypt API key: ${error.message}`);
       throw new Error('Failed to decrypt API key');
     }
   },

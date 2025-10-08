@@ -14,17 +14,19 @@ module.exports = ({ strapi }) => ({
 
         // Don't retry on client errors (400-499) except 429 (rate limit)
         if (error.response?.status >= 400 && error.response?.status < 500 && error.response?.status !== 429) {
+          strapi.log.warn(`[Strapi Localize] DeepL API client error: status=${error.response.status}, message=${error.message}`);
           throw error;
         }
 
         // If this was the last attempt, throw the error
         if (attempt === maxRetries - 1) {
+          strapi.log.error(`[Strapi Localize] DeepL API request failed after ${maxRetries} attempts: ${error.message}`);
           throw error;
         }
 
         // Calculate delay with exponential backoff
         const delay = initialDelay * Math.pow(2, attempt);
-        strapi.log.warn(`DeepL API request failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
+        strapi.log.warn(`[Strapi Localize] DeepL API request failed: attempt=${attempt + 1}/${maxRetries}, retrying_in=${delay}ms, error=${error.message}`);
 
         // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -41,27 +43,31 @@ module.exports = ({ strapi }) => ({
   async getApiUrl(endpoint) {
     const apiKey = await this.getApiKey();
     if (!apiKey) {
+      strapi.log.error('[Strapi Localize] DeepL API key not configured');
       throw new Error('DeepL API key not configured');
     }
 
-    const baseUrl = this.isFreeApiKey(apiKey)
-      ? 'https://api-free.deepl.com'
-      : 'https://api.deepl.com';
+    const isFree = this.isFreeApiKey(apiKey);
+    const baseUrl = isFree ? 'https://api-free.deepl.com' : 'https://api.deepl.com';
+
+    strapi.log.debug(`[Strapi Localize] Using DeepL API: type=${isFree ? 'free' : 'pro'}, endpoint=${endpoint}`);
 
     return `${baseUrl}/v2/${endpoint}`;
   },
 
   async makeDeeplRequest(endpoint, method = 'GET', data = null, params = {}) {
+    const startTime = Date.now();
     const apiKey = await this.getApiKey();
     if (!apiKey) {
+      strapi.log.error('[Strapi Localize] DeepL API key not configured');
       throw new Error('DeepL API key not configured');
     }
 
-    const baseUrl = this.isFreeApiKey(apiKey)
-      ? 'https://api-free.deepl.com'
-      : 'https://api.deepl.com';
-
+    const isFree = this.isFreeApiKey(apiKey);
+    const baseUrl = isFree ? 'https://api-free.deepl.com' : 'https://api.deepl.com';
     const url = `${baseUrl}/v2/${endpoint}`;
+
+    strapi.log.info(`[Strapi Localize] DeepL API request: method=${method}, endpoint=${endpoint}, api_type=${isFree ? 'free' : 'pro'}`);
 
     return await this.retryWithBackoff(async () => {
       const config = {
@@ -79,6 +85,9 @@ module.exports = ({ strapi }) => ({
       }
 
       const response = await axios(config);
+      const duration = Date.now() - startTime;
+      strapi.log.info(`[Strapi Localize] DeepL API response: endpoint=${endpoint}, duration=${duration}ms, status=${response.status}`);
+
       return response.data;
     });
   },
@@ -94,14 +103,17 @@ module.exports = ({ strapi }) => ({
   },
 
   async getAvailableLanguages() {
+    const startTime = Date.now();
     const apiKey = await this.getApiKey();
     if (!apiKey) {
+      strapi.log.error('[Strapi Localize] DeepL API key not configured');
       throw new Error('DeepL API key not configured');
     }
 
-    const baseUrl = this.isFreeApiKey(apiKey)
-      ? 'https://api-free.deepl.com'
-      : 'https://api.deepl.com';
+    const isFree = this.isFreeApiKey(apiKey);
+    const baseUrl = isFree ? 'https://api-free.deepl.com' : 'https://api.deepl.com';
+
+    strapi.log.info(`[Strapi Localize] Fetching available languages from DeepL: api_type=${isFree ? 'free' : 'pro'}`);
 
     return await this.retryWithBackoff(async () => {
       const response = await axios.get(`${baseUrl}/v2/languages`, {
@@ -110,6 +122,9 @@ module.exports = ({ strapi }) => ({
           type: 'target',
         },
       });
+
+      const duration = Date.now() - startTime;
+      strapi.log.info(`[Strapi Localize] Fetched languages: count=${response.data?.length || 0}, duration=${duration}ms`);
 
       return response.data;
     });
@@ -120,8 +135,10 @@ module.exports = ({ strapi }) => ({
       return text;
     }
 
+    const startTime = Date.now();
     const apiKey = await this.getApiKey();
     if (!apiKey) {
+      strapi.log.error('[Strapi Localize] DeepL API key not configured');
       throw new Error('DeepL API key not configured');
     }
 
@@ -145,11 +162,14 @@ module.exports = ({ strapi }) => ({
 
     if (glossaryId) {
       params.glossary_id = glossaryId;
+      strapi.log.debug(`[Strapi Localize] Using glossary: id=${glossaryId}, lang_pair=${langPairKey}`);
     }
 
-    const baseUrl = this.isFreeApiKey(apiKey)
-      ? 'https://api-free.deepl.com'
-      : 'https://api.deepl.com';
+    const isFree = this.isFreeApiKey(apiKey);
+    const baseUrl = isFree ? 'https://api-free.deepl.com' : 'https://api.deepl.com';
+
+    const textPreview = text.length > 50 ? `${text.substring(0, 50)}...` : text;
+    strapi.log.debug(`[Strapi Localize] Translating text: source=${sourceLang || 'auto'}, target=${targetLang}, length=${text.length}, preview="${textPreview}"`);
 
     try {
       return await this.retryWithBackoff(async () => {
@@ -157,10 +177,15 @@ module.exports = ({ strapi }) => ({
           params,
         });
 
-        return response.data.translations[0].text;
+        const duration = Date.now() - startTime;
+        const translatedText = response.data.translations[0].text;
+        strapi.log.debug(`[Strapi Localize] Translation successful: duration=${duration}ms, chars_translated=${text.length}`);
+
+        return translatedText;
       });
     } catch (error) {
-      strapi.log.error('DeepL translation error:', error.message);
+      const duration = Date.now() - startTime;
+      strapi.log.error(`[Strapi Localize] Translation failed: source=${sourceLang || 'auto'}, target=${targetLang}, duration=${duration}ms, error=${error.message}`);
       throw error;
     }
   },
@@ -202,12 +227,16 @@ module.exports = ({ strapi }) => ({
   },
 
   async translateContent(entityId, model, targetLocale, sourceLocale = null) {
+    const startTime = Date.now();
+    strapi.log.info(`[Strapi Localize] Starting content translation: model=${model}, id=${entityId}, source=${sourceLocale || 'auto'}, target=${targetLocale}`);
+
     const entity = await strapi.entityService.findOne(model, entityId, {
       populate: 'deep',
       locale: sourceLocale || 'en',
     });
 
     if (!entity) {
+      strapi.log.error(`[Strapi Localize] Entity not found: model=${model}, id=${entityId}`);
       throw new Error('Entity not found');
     }
 
@@ -220,6 +249,8 @@ module.exports = ({ strapi }) => ({
     const settings = await pluginStore.get({ key: 'settings' });
     const contentTypeConfig = settings?.contentTypes?.[model] || {};
     const fieldsToIgnore = contentTypeConfig.ignoredFields || [];
+
+    strapi.log.debug(`[Strapi Localize] Translation config: model=${model}, ignored_fields=${fieldsToIgnore.length}`);
 
     const systemFields = [
       'id',
@@ -276,29 +307,42 @@ module.exports = ({ strapi }) => ({
       t.localizations?.some(l => l.id === entity.id)
     );
 
+    let result;
     if (existingForSource) {
-      return await strapi.entityService.update(model, existingForSource.id, {
+      strapi.log.debug(`[Strapi Localize] Updating existing translation: model=${model}, translation_id=${existingForSource.id}`);
+      result = await strapi.entityService.update(model, existingForSource.id, {
         data: finalData,
       });
     } else {
-      return await strapi.entityService.create(model, {
+      strapi.log.debug(`[Strapi Localize] Creating new translation: model=${model}`);
+      result = await strapi.entityService.create(model, {
         data: finalData,
       });
     }
+
+    const duration = Date.now() - startTime;
+    strapi.log.info(`[Strapi Localize] Content translation completed: model=${model}, id=${entityId}, target=${targetLocale}, duration=${duration}ms, result_id=${result.id}`);
+
+    return result;
   },
 
   // Glossary Management Methods
   async listGlossaries() {
     try {
-      return await this.makeDeeplRequest('glossaries', 'GET');
+      strapi.log.debug('[Strapi Localize] Listing DeepL glossaries');
+      const result = await this.makeDeeplRequest('glossaries', 'GET');
+      strapi.log.info(`[Strapi Localize] Listed glossaries: count=${result.glossaries?.length || 0}`);
+      return result;
     } catch (error) {
-      strapi.log.error('Failed to list glossaries:', error.message);
+      strapi.log.error(`[Strapi Localize] Failed to list glossaries: ${error.message}`);
       return { glossaries: [] };
     }
   },
 
   async createGlossary(name, sourceLang, targetLang, entries) {
     try {
+      strapi.log.info(`[Strapi Localize] Creating glossary: name="${name}", source=${sourceLang}, target=${targetLang}, entries=${entries.length}`);
+
       // Format entries as TSV (tab-separated values)
       const entriesText = entries
         .map(entry => `${entry.term}\t${entry.translation}`)
@@ -312,41 +356,52 @@ module.exports = ({ strapi }) => ({
         entries_format: 'tsv',
       });
 
+      strapi.log.info(`[Strapi Localize] Glossary created: id=${response.glossary_id}, name="${name}"`);
       return response;
     } catch (error) {
-      strapi.log.error('Failed to create glossary:', error.message);
+      strapi.log.error(`[Strapi Localize] Failed to create glossary "${name}": ${error.message}`);
       throw error;
     }
   },
 
   async deleteGlossary(glossaryId) {
     try {
+      strapi.log.info(`[Strapi Localize] Deleting glossary: id=${glossaryId}`);
       await this.makeDeeplRequest(`glossaries/${glossaryId}`, 'DELETE');
+      strapi.log.info(`[Strapi Localize] Glossary deleted: id=${glossaryId}`);
       return true;
     } catch (error) {
-      strapi.log.error('Failed to delete glossary:', error.message);
+      strapi.log.error(`[Strapi Localize] Failed to delete glossary ${glossaryId}: ${error.message}`);
       return false;
     }
   },
 
   async getGlossaryEntries(glossaryId) {
     try {
+      strapi.log.debug(`[Strapi Localize] Fetching glossary entries: id=${glossaryId}`);
       const response = await this.makeDeeplRequest(`glossaries/${glossaryId}/entries`, 'GET');
+      strapi.log.debug(`[Strapi Localize] Fetched glossary entries: id=${glossaryId}`);
       return response;
     } catch (error) {
-      strapi.log.error('Failed to get glossary entries:', error.message);
+      strapi.log.error(`[Strapi Localize] Failed to get glossary entries for ${glossaryId}: ${error.message}`);
       return [];
     }
   },
 
   async syncGlossaries() {
+    const startTime = Date.now();
+    strapi.log.info('[Strapi Localize] Starting glossary sync with DeepL');
+
     const settingsService = strapi.plugin('strapi-localize').service('settings');
     const settings = await settingsService.getSettings();
     const glossary = settings.glossary || [];
 
     if (glossary.length === 0) {
+      strapi.log.info('[Strapi Localize] No glossary entries configured, skipping sync');
       return;
     }
+
+    strapi.log.debug(`[Strapi Localize] Syncing glossary: total_entries=${glossary.length}`);
 
     // Get existing glossaries from DeepL
     const existingGlossaries = await this.listGlossaries();
@@ -369,8 +424,13 @@ module.exports = ({ strapi }) => ({
       }
     }
 
+    strapi.log.info(`[Strapi Localize] Glossary language pairs to sync: count=${Object.keys(glossariesByLangPair).length}`);
+
     // Create or update glossaries for each language pair
     const glossaryIds = {};
+    let created = 0;
+    let updated = 0;
+    let failed = 0;
 
     for (const [langPair, entries] of Object.entries(glossariesByLangPair)) {
       const [sourceLang, targetLang] = langPair.split('_');
@@ -383,7 +443,11 @@ module.exports = ({ strapi }) => ({
 
       if (existing) {
         // Delete and recreate (v2 glossaries are immutable)
+        strapi.log.debug(`[Strapi Localize] Updating existing glossary: lang_pair=${langPair}, id=${existing.glossary_id}`);
         await this.deleteGlossary(existing.glossary_id);
+        updated++;
+      } else {
+        created++;
       }
 
       // Create new glossary
@@ -396,13 +460,17 @@ module.exports = ({ strapi }) => ({
         );
         glossaryIds[langPair] = newGlossary.glossary_id;
       } catch (error) {
-        strapi.log.error(`Failed to create glossary for ${langPair}:`, error.message);
+        strapi.log.error(`[Strapi Localize] Failed to create glossary for ${langPair}: ${error.message}`);
+        failed++;
       }
     }
 
     // Store glossary IDs in settings
     settings.glossaryIds = glossaryIds;
     await settingsService.updateSettings(settings);
+
+    const duration = Date.now() - startTime;
+    strapi.log.info(`[Strapi Localize] Glossary sync completed: created=${created}, updated=${updated}, failed=${failed}, duration=${duration}ms`);
 
     return glossaryIds;
   },

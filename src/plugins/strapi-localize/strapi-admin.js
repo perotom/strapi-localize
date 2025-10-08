@@ -1,13 +1,15 @@
 // Strapi v5 compatible admin panel configuration
 export default {
   register(app) {
+    console.log('✅ strapi-localize: register() called');
+
     // Add main menu link
     app.addMenuLink({
-      to: '/plugins/deepl-translate',
+      to: '/plugins/strapi-localize',
       icon: 'globe',
       intlLabel: {
-        id: 'deepl-translate.plugin.name',
-        defaultMessage: 'DeepL Translate',
+        id: 'strapi-localize.plugin.name',
+        defaultMessage: 'Strapi Localize',
       },
       Component: async () => {
         const component = await import('./admin/src/pages/HomePage');
@@ -15,7 +17,7 @@ export default {
       },
       permissions: [
         {
-          action: 'plugin::deepl-translate.read',
+          action: 'plugin::strapi-localize.read',
           subject: null,
         },
       ],
@@ -24,27 +26,27 @@ export default {
     // Create settings section
     app.createSettingSection(
       {
-        id: 'deepl-translate',
+        id: 'strapi-localize',
         intlLabel: {
-          id: 'deepl-translate.plugin.name',
-          defaultMessage: 'DeepL Translate',
+          id: 'strapi-localize.plugin.name',
+          defaultMessage: 'Strapi Localize',
         },
       },
       [
         {
           intlLabel: {
-            id: 'deepl-translate.settings.title',
+            id: 'strapi-localize.settings.title',
             defaultMessage: 'Settings',
           },
           id: 'settings',
-          to: '/settings/deepl-translate',
+          to: '/settings/strapi-localize',
           Component: async () => {
             const component = await import('./admin/src/pages/Settings');
             return component;
           },
           permissions: [
             {
-              action: 'plugin::deepl-translate.settings.read',
+              action: 'plugin::strapi-localize.settings.read',
               subject: null,
             },
           ],

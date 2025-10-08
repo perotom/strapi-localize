@@ -161,7 +161,7 @@ server/
 ### Production Deployment Checklist
 
 - [ ] Set strong `DEEPL_ENCRYPTION_KEY` environment variable
-- [ ] Configure DeepL API key ONLY via admin UI (Settings > DeepL Translate)
+- [ ] Configure DeepL API key ONLY via admin UI (Settings > Strapi Localize)
 - [ ] Never store DeepL API key in environment variables or plugin config
 - [ ] Configure proper RBAC permissions for users
 - [ ] Restrict `settings.update` permission to Super Admins only

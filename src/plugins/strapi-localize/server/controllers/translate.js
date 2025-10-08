@@ -52,29 +52,36 @@ module.exports = ({ strapi }) => ({
   },
 
   async translate(ctx) {
-    try {
-      const { id, model, targetLocale, sourceLocale } = ctx.request.body;
+    const startTime = Date.now();
+    const { id, model, targetLocale, sourceLocale } = ctx.request.body;
 
+    strapi.log.info(`[Strapi Localize] Translation request: model=${model}, id=${id}, target=${targetLocale}, source=${sourceLocale || 'auto'}`);
+
+    try {
       // Validate required parameters
       if (!id || !model || !targetLocale) {
+        strapi.log.warn(`[Strapi Localize] Translation validation failed: Missing required parameters`);
         return ctx.badRequest('Missing required parameters: id, model, targetLocale');
       }
 
       // Validate ID
       const idValidation = this.validateId(id);
       if (!idValidation.valid) {
+        strapi.log.warn(`[Strapi Localize] Translation validation failed: ${idValidation.error}`);
         return ctx.badRequest(idValidation.error);
       }
 
       // Validate model
       const modelValidation = this.validateContentModel(model);
       if (!modelValidation.valid) {
+        strapi.log.warn(`[Strapi Localize] Translation validation failed: ${modelValidation.error}`);
         return ctx.badRequest(modelValidation.error);
       }
 
       // Validate target locale
       const targetLocaleValidation = this.validateLocale(targetLocale);
       if (!targetLocaleValidation.valid) {
+        strapi.log.warn(`[Strapi Localize] Translation validation failed: ${targetLocaleValidation.error}`);
         return ctx.badRequest(targetLocaleValidation.error);
       }
 
@@ -82,6 +89,7 @@ module.exports = ({ strapi }) => ({
       if (sourceLocale) {
         const sourceLocaleValidation = this.validateLocale(sourceLocale);
         if (!sourceLocaleValidation.valid) {
+          strapi.log.warn(`[Strapi Localize] Translation validation failed: ${sourceLocaleValidation.error}`);
           return ctx.badRequest(sourceLocaleValidation.error);
         }
       }
@@ -91,33 +99,44 @@ module.exports = ({ strapi }) => ({
         .service('deepl')
         .translateContent(id, model, targetLocale, sourceLocale);
 
+      const duration = Date.now() - startTime;
+      strapi.log.info(`[Strapi Localize] Translation completed: model=${model}, id=${id}, duration=${duration}ms`);
+
       ctx.body = result;
     } catch (error) {
-      strapi.log.error('Translation error:', error);
+      const duration = Date.now() - startTime;
+      strapi.log.error(`[Strapi Localize] Translation error: model=${model}, id=${id}, duration=${duration}ms, error=${error.message}`);
       ctx.throw(500, error.message || 'Translation failed');
     }
   },
 
   async translateBatch(ctx) {
-    try {
-      const { ids, model, targetLocale, sourceLocale } = ctx.request.body;
+    const startTime = Date.now();
+    const { ids, model, targetLocale, sourceLocale } = ctx.request.body;
 
+    strapi.log.info(`[Strapi Localize] Batch translation request: model=${model}, count=${ids?.length || 0}, target=${targetLocale}, source=${sourceLocale || 'auto'}`);
+
+    try {
       // Validate required parameters
       if (!ids || !model || !targetLocale) {
+        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: Missing required parameters`);
         return ctx.badRequest('Missing required parameters: ids, model, targetLocale');
       }
 
       // Validate ids is an array
       if (!Array.isArray(ids)) {
+        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: ids must be an array`);
         return ctx.badRequest('ids must be an array');
       }
 
       // Validate batch size (max 50 items to prevent overload)
       if (ids.length === 0) {
+        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: Empty array`);
         return ctx.badRequest('ids array cannot be empty');
       }
 
       if (ids.length > 50) {
+        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: Batch size ${ids.length} exceeds maximum of 50`);
         return ctx.badRequest('Maximum batch size is 50 items');
       }
 
@@ -192,6 +211,14 @@ module.exports = ({ strapi }) => ({
       const successCount = formattedResults.filter(r => r.status === 'success').length;
       const failureCount = formattedResults.filter(r => r.status === 'failed').length;
 
+      const duration = Date.now() - startTime;
+      strapi.log.info(`[Strapi Localize] Batch translation completed: model=${model}, total=${ids.length}, successful=${successCount}, failed=${failureCount}, duration=${duration}ms`);
+
+      if (failureCount > 0) {
+        const failedIds = formattedResults.filter(r => r.status === 'failed').map(r => r.id);
+        strapi.log.warn(`[Strapi Localize] Failed translations for IDs: ${failedIds.join(', ')}`);
+      }
+
       ctx.body = {
         results: formattedResults,
         summary: {
@@ -201,7 +228,8 @@ module.exports = ({ strapi }) => ({
         }
       };
     } catch (error) {
-      strapi.log.error('Batch translation error:', error);
+      const duration = Date.now() - startTime;
+      strapi.log.error(`[Strapi Localize] Batch translation error: model=${model}, count=${ids?.length || 0}, duration=${duration}ms, error=${error.message}`);
       ctx.throw(500, error.message || 'Batch translation failed');
     }
   },

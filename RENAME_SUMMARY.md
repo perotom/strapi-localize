@@ -125,10 +125,27 @@ New: plugin::strapi-localize.translate
 ### 7. Documentation Updated
 
 **Files updated:**
-- `README.md`
-- `CHANGELOG.md`
-- `CONFIGURATION.md`
-- `SECURITY.md`
+- `README.md` - All references, title, and menu paths updated
+- `CHANGELOG.md` - Package name and examples updated
+- `CONFIGURATION.md` - Configuration examples updated
+- `SECURITY.md` - Security checklist updated
+
+**README Title Updated:**
+```markdown
+# Strapi Localize  // Was: Strapi DeepL Translate Plugin
+```
+
+**Settings Menu References:**
+```
+Old: Settings > DeepL Translate
+New: Settings > Strapi Localize
+```
+
+**Admin Menu References:**
+```
+Old: DeepL Translate in the admin menu
+New: Strapi Localize in the admin menu
+```
 
 **Plugin configuration examples:**
 ```javascript

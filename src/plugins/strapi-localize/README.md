@@ -1,4 +1,4 @@
-# Strapi DeepL Translate Plugin
+# Strapi Localize
 
 A powerful Strapi v5 plugin that automatically translates your content using the DeepL API. This plugin seamlessly integrates with Strapi's internationalization (i18n) system to provide high-quality translations across all your localized content.
 
@@ -112,7 +112,7 @@ The plugin implements role-based access control (RBAC) for all operations:
 **Via Strapi Admin Panel:**
 1. Navigate to **Settings > Administration Panel > Roles**
 2. Select a role (Editor, Author, etc.)
-3. Expand **Plugins > DeepL Translate**
+3. Expand **Plugins > Strapi Localize**
 4. Check/uncheck desired permissions
 5. Save changes
 
@@ -133,7 +133,7 @@ Translator:     ✗ settings.read  ✗ settings.update  ✓ translate
 
 ### Plugin Settings Page
 
-After installation, navigate to **Settings > DeepL Translate** in your Strapi admin panel:
+After installation, navigate to **Settings > Strapi Localize** in your Strapi admin panel:
 
 #### Global Settings
 - **API Key**: Enter your DeepL API authentication key here (securely encrypted in database)
@@ -185,7 +185,7 @@ The plugin automatically detects and translates these field types:
 
 #### Batch Translation
 
-1. Go to **DeepL Translate** in the admin menu
+1. Go to **Strapi Localize** in the admin menu
 2. Select content type
 3. Choose target language
 4. Select multiple items using checkboxes
@@ -207,7 +207,7 @@ When enabled, the plugin automatically translates content:
 
 #### Via Admin UI
 
-1. Go to **Settings → DeepL Translate**
+1. Go to **Settings → Strapi Localize**
 2. Select your content type
 3. In "Fields to ignore", choose fields like:
    - `slug` - URL paths
@@ -522,7 +522,7 @@ const oldTranslations = await strapi
   .service('export')
   .exportAll();
 
-// Import to DeepL Translate
+// Import to Strapi Localize
 for (const item of oldTranslations) {
   await strapi
     .plugin('strapi-localize')
