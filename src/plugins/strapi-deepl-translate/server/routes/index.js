@@ -9,7 +9,15 @@ module.exports = {
         path: '/settings',
         handler: 'settings.get',
         config: {
-          policies: [],
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.settings.read'],
+              },
+            },
+          ],
         },
       },
       {
@@ -17,7 +25,15 @@ module.exports = {
         path: '/settings',
         handler: 'settings.update',
         config: {
-          policies: [],
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.settings.update'],
+              },
+            },
+          ],
         },
       },
       {
@@ -25,7 +41,15 @@ module.exports = {
         path: '/content-types',
         handler: 'settings.getContentTypes',
         config: {
-          policies: [],
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.settings.read'],
+              },
+            },
+          ],
         },
       },
       {
@@ -33,7 +57,15 @@ module.exports = {
         path: '/test-connection',
         handler: 'settings.testConnection',
         config: {
-          policies: [],
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.settings.read'],
+              },
+            },
+          ],
         },
       },
       {
@@ -41,7 +73,15 @@ module.exports = {
         path: '/translate',
         handler: 'translate.translate',
         config: {
-          policies: [],
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.translate'],
+              },
+            },
+          ],
         },
       },
       {
@@ -49,7 +89,15 @@ module.exports = {
         path: '/translate-batch',
         handler: 'translate.translateBatch',
         config: {
-          policies: [],
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.translate'],
+              },
+            },
+          ],
         },
       },
       {
@@ -57,7 +105,47 @@ module.exports = {
         path: '/languages',
         handler: 'translate.getLanguages',
         config: {
-          policies: [],
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.settings.read'],
+              },
+            },
+          ],
+        },
+      },
+      {
+        method: 'POST',
+        path: '/sync-glossaries',
+        handler: 'settings.syncGlossaries',
+        config: {
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.settings.update'],
+              },
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        path: '/list-glossaries',
+        handler: 'settings.listGlossaries',
+        config: {
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: {
+                actions: ['plugin::deepl-translate.settings.read'],
+              },
+            },
+          ],
         },
       },
     ],

@@ -46,11 +46,7 @@ npm install axios
 module.exports = {
   'strapi-deepl-translate': {
     enabled: true,
-    config: {
-      // Optional: Default configuration
-      apiKey: process.env.DEEPL_API_KEY, // Can also be set via UI
-      autoTranslate: false, // Global auto-translate setting
-    }
+    resolve: './src/plugins/strapi-deepl-translate'
   },
 };
 ```
@@ -65,30 +61,86 @@ npm run develop
 
 ### Environment Variables
 
-You can configure the plugin using environment variables:
+The plugin requires one environment variable for security:
 
 ```bash
 # .env
-DEEPL_API_KEY=your-deepl-api-key-here
-DEEPL_AUTO_TRANSLATE=true
+DEEPL_ENCRYPTION_KEY=your-strong-secret-key-min-32-chars  # Required for API key encryption
 ```
+
+**Important Security Notes:**
+- The `DEEPL_ENCRYPTION_KEY` is **required** to encrypt API keys stored in the database
+- Use a strong, random key (minimum 32 characters)
+- Never commit encryption keys to version control
+- If not set, the plugin will use Strapi's `admin.apiToken.salt` as fallback
+- **The DeepL API key itself is configured via the admin UI, not environment variables**
 
 ### Getting a DeepL API Key
 
 1. Sign up for a DeepL account at [deepl.com](https://www.deepl.com/pro-api)
 2. Choose your plan:
-   - **Free**: 500,000 characters/month
+   - **Free**: 500,000 characters/month (API keys end with `:fx`)
    - **Pro**: Unlimited usage with pay-as-you-go pricing
 3. Copy your API key from the account settings
+
+**Note**: The plugin automatically detects Free vs Pro API keys based on the `:fx` suffix and uses the correct API endpoint.
+
+### Permissions & Access Control
+
+The plugin implements role-based access control (RBAC) for all operations:
+
+#### Permission Actions
+
+1. **`plugin::deepl-translate.settings.read`**
+   - View plugin settings
+   - Test API connection
+   - List available languages
+   - View content types
+
+2. **`plugin::deepl-translate.settings.update`**
+   - Modify plugin configuration
+   - Update API key
+   - Change content type settings
+   - Sync glossaries
+
+3. **`plugin::deepl-translate.translate`**
+   - Perform single translations
+   - Execute batch translations
+
+#### Configuring Permissions
+
+**Via Strapi Admin Panel:**
+1. Navigate to **Settings > Administration Panel > Roles**
+2. Select a role (Editor, Author, etc.)
+3. Expand **Plugins > DeepL Translate**
+4. Check/uncheck desired permissions
+5. Save changes
+
+**Example Configuration:**
+```javascript
+// Recommended role setup
+Super Admin:    ✓ settings.read  ✓ settings.update  ✓ translate
+Editor:         ✓ settings.read  ✗ settings.update  ✓ translate
+Author:         ✗ settings.read  ✗ settings.update  ✓ translate
+Translator:     ✗ settings.read  ✗ settings.update  ✓ translate
+```
+
+**Security Best Practices:**
+- Only grant `settings.update` to trusted administrators
+- API key changes should be restricted to Super Admins
+- Content editors should only have `translate` permission
+- Audit permission changes regularly
 
 ### Plugin Settings Page
 
 After installation, navigate to **Settings > DeepL Translate** in your Strapi admin panel:
 
 #### Global Settings
-- **API Key**: Your DeepL API authentication key
-- **Test Connection**: Verify your API key is valid
+- **API Key**: Enter your DeepL API authentication key here (securely encrypted in database)
+- **Test Connection**: Verify your API key is valid before saving
 - **Auto-Translation**: Enable/disable automatic translation globally
+
+**Note**: The API key is stored encrypted in the database and can only be changed through this admin interface.
 
 #### Content Type Settings
 For each content type with i18n enabled:

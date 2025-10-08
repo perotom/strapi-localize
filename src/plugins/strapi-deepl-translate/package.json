@@ -8,8 +8,16 @@
     "kind": "plugin",
     "displayName": "DeepL Translate"
   },
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
   "dependencies": {
     "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   },
   "peerDependencies": {
     "@strapi/strapi": "^5.0.0",

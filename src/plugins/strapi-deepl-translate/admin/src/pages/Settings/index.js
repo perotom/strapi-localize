@@ -15,8 +15,17 @@ import {
   CardContent,
   MultiSelect,
   MultiSelectOption,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Td,
+  Th,
+  IconButton,
+  Select,
+  Option,
 } from '@strapi/design-system';
-import { Check, ExclamationMarkCircle } from '@strapi/icons';
+import { Check, ExclamationMarkCircle, Trash, Plus } from '@strapi/icons';
 import { useFetchClient, useNotification } from '@strapi/helper-plugin';
 import { useIntl } from 'react-intl';
 
@@ -29,12 +38,20 @@ const Settings = () => {
     apiKey: '',
     contentTypes: {},
     autoTranslate: false,
+    glossary: [],
   });
   const [contentTypes, setContentTypes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
+  const [availableLanguages, setAvailableLanguages] = useState([]);
+  const [newGlossaryEntry, setNewGlossaryEntry] = useState({
+    term: '',
+    translations: {},
+  });
+  const [isSyncingGlossaries, setIsSyncingGlossaries] = useState(false);
+  const [glossarySyncStatus, setGlossarySyncStatus] = useState(null);
 
   useEffect(() => {
     fetchSettings();
@@ -91,6 +108,7 @@ const Settings = () => {
       const data = response.data || response;
       setConnectionStatus(data.success);
       if (data.success) {
+        setAvailableLanguages(data.languages || []);
         toggleNotification({
           type: 'success',
           message: `Connected! ${data.languages.length} languages available`,
@@ -148,6 +166,76 @@ const Settings = () => {
         },
       },
     }));
+  };
+
+  const handleAddGlossaryEntry = () => {
+    if (!newGlossaryEntry.term.trim()) {
+      toggleNotification({
+        type: 'warning',
+        message: 'Please enter a term',
+      });
+      return;
+    }
+
+    setSettings(prev => ({
+      ...prev,
+      glossary: [...(prev.glossary || []), { ...newGlossaryEntry, id: Date.now() }],
+    }));
+
+    setNewGlossaryEntry({
+      term: '',
+      translations: {},
+    });
+  };
+
+  const handleRemoveGlossaryEntry = (id) => {
+    setSettings(prev => ({
+      ...prev,
+      glossary: (prev.glossary || []).filter(entry => entry.id !== id),
+    }));
+  };
+
+  const handleGlossaryTranslationChange = (entryId, language, translation) => {
+    setSettings(prev => ({
+      ...prev,
+      glossary: (prev.glossary || []).map(entry =>
+        entry.id === entryId
+          ? { ...entry, translations: { ...entry.translations, [language]: translation } }
+          : entry
+      ),
+    }));
+  };
+
+  const handleSyncGlossaries = async () => {
+    setIsSyncingGlossaries(true);
+    setGlossarySyncStatus(null);
+
+    try {
+      const response = await post('/deepl-translate/sync-glossaries');
+      const data = response.data || response;
+
+      if (data.success) {
+        setGlossarySyncStatus('success');
+        toggleNotification({
+          type: 'success',
+          message: 'Glossaries synced with DeepL successfully',
+        });
+      } else {
+        setGlossarySyncStatus('error');
+        toggleNotification({
+          type: 'warning',
+          message: data.error || 'Failed to sync glossaries',
+        });
+      }
+    } catch (error) {
+      setGlossarySyncStatus('error');
+      toggleNotification({
+        type: 'warning',
+        message: 'Failed to sync glossaries with DeepL',
+      });
+    }
+
+    setIsSyncingGlossaries(false);
   };
 
   if (isLoading) {
@@ -310,6 +398,124 @@ const Settings = () => {
                   })}
                 </Flex>
               )}
+            </CardContent>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <Flex justifyContent="space-between" alignItems="center">
+              <Typography variant="beta">Translation Glossary</Typography>
+              <Button
+                onClick={handleSyncGlossaries}
+                loading={isSyncingGlossaries}
+                disabled={!settings.apiKey || (!settings.glossary || settings.glossary.length === 0)}
+                variant="secondary"
+                size="S"
+              >
+                Sync with DeepL
+              </Button>
+            </Flex>
+          </CardHeader>
+          <CardBody>
+            <CardContent>
+              <Box marginBottom={4}>
+                <Typography variant="pi" textColor="neutral600">
+                  Define terms and their translations to ensure consistency across all translations. Glossaries are automatically synced with DeepL when you save settings.
+                </Typography>
+              </Box>
+
+              {glossarySyncStatus === 'success' && (
+                <Alert variant="success" marginBottom={4}>
+                  Glossaries are synced with DeepL
+                </Alert>
+              )}
+
+              {settings.glossaryIds && Object.keys(settings.glossaryIds).length > 0 && (
+                <Box marginBottom={4}>
+                  <Typography variant="pi" fontWeight="semiBold">
+                    Active DeepL Glossaries: {Object.keys(settings.glossaryIds).length}
+                  </Typography>
+                </Box>
+              )}
+
+              <Flex direction="column" gap={4}>
+                <Flex gap={2} alignItems="end">
+                  <TextInput
+                    label="Term"
+                    placeholder="Enter a term (e.g., 'Strapi')"
+                    value={newGlossaryEntry.term}
+                    onChange={(e) =>
+                      setNewGlossaryEntry({ ...newGlossaryEntry, term: e.target.value })
+                    }
+                  />
+                  <Button
+                    onClick={handleAddGlossaryEntry}
+                    startIcon={<Plus />}
+                    variant="secondary"
+                  >
+                    Add Term
+                  </Button>
+                </Flex>
+
+                {settings.glossary && settings.glossary.length > 0 && (
+                  <Box>
+                    <Table>
+                      <Thead>
+                        <Tr>
+                          <Th>Term</Th>
+                          {availableLanguages.length > 0 && (
+                            availableLanguages.slice(0, 3).map(lang => (
+                              <Th key={lang.language}>{lang.name}</Th>
+                            ))
+                          )}
+                          <Th>Actions</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {settings.glossary.map((entry) => (
+                          <Tr key={entry.id}>
+                            <Td>
+                              <Typography fontWeight="semiBold">{entry.term}</Typography>
+                            </Td>
+                            {availableLanguages.length > 0 && (
+                              availableLanguages.slice(0, 3).map(lang => (
+                                <Td key={lang.language}>
+                                  <TextInput
+                                    placeholder={`Translation for ${lang.name}`}
+                                    value={entry.translations[lang.language] || ''}
+                                    onChange={(e) =>
+                                      handleGlossaryTranslationChange(
+                                        entry.id,
+                                        lang.language,
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Td>
+                              ))
+                            )}
+                            <Td>
+                              <IconButton
+                                onClick={() => handleRemoveGlossaryEntry(entry.id)}
+                                label="Remove"
+                                icon={<Trash />}
+                                variant="ghost"
+                              />
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                )}
+
+                {(!settings.glossary || settings.glossary.length === 0) && (
+                  <Alert variant="default">
+                    No glossary terms defined yet. Add terms above to ensure consistent translations.
+                  </Alert>
+                )}
+              </Flex>
             </CardContent>
           </CardBody>
         </Card>

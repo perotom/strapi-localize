@@ -11,16 +11,9 @@ module.exports = {
   controllers,
   routes,
 
+  // No config needed - all settings managed through admin UI
   config: {
-    default: {
-      apiKey: '',
-      autoTranslate: false,
-      contentTypes: {},
-    },
-    validator: (config) => {
-      if (config.apiKey && typeof config.apiKey !== 'string') {
-        throw new Error('API key must be a string');
-      }
-    },
+    default: {},
+    validator: () => {},
   },
 };
