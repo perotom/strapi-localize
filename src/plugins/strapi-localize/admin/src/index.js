@@ -1,42 +1,25 @@
-import { prefixPluginTranslations } from '@strapi/helper-plugin';
-import pluginId from './pluginId';
-import PluginIcon from './components/PluginIcon';
-
-const name = 'strapi-localize';
+import { PLUGIN_ID } from './pluginId';
 
 export default {
   register(app) {
-    // Register the plugin
     app.registerPlugin({
-      id: pluginId,
-      name,
-      isReady: true,
+      id: PLUGIN_ID,
+      name: PLUGIN_ID,
+      isReady: false,
     });
   },
 
-  bootstrap(app) {
-    // Bootstrap phase - additional initialization if needed
-  },
-
   async registerTrads({ locales }) {
-    const importedTrads = await Promise.all(
-      locales.map((locale) => {
-        return import(`./translations/${locale}.json`)
-          .then(({ default: data }) => {
-            return {
-              data: prefixPluginTranslations(data, pluginId),
-              locale,
-            };
-          })
-          .catch(() => {
-            return {
-              data: {},
-              locale,
-            };
-          });
+    return Promise.all(
+      locales.map(async (locale) => {
+        try {
+          const { default: data } = await import(`./translations/${locale}.json`);
+
+          return { data, locale };
+        } catch {
+          return { data: {}, locale };
+        }
       })
     );
-
-    return Promise.resolve(importedTrads);
   },
 };

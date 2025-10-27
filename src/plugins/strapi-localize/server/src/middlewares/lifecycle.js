@@ -1,10 +1,20 @@
 'use strict';
 
 module.exports = ({ strapi }) => {
+  // Track entries being translated to prevent infinite loops (PDF page 5)
+  const translatingEntries = new Set();
+
   const translateOnUpdate = async (event) => {
     const { model, data, where } = event.params;
 
     strapi.log.debug(`[Strapi Localize] Lifecycle hook triggered: model=${model.uid}, id=${where.id}`);
+
+    // Prevent infinite loop: Check if this entry is being created by our translation process
+    const entryKey = `${model.uid}:${where.id}`;
+    if (translatingEntries.has(entryKey)) {
+      strapi.log.debug(`[Strapi Localize] Skipping - entry is being translated: ${entryKey}`);
+      return;
+    }
 
     const settings = await strapi
       .plugin('strapi-localize')
@@ -32,8 +42,15 @@ module.exports = ({ strapi }) => {
       populate: ['localizations'],
     });
 
-    if (!entity || !entity.localizations || entity.localizations.length === 0) {
-      strapi.log.debug(`[Strapi Localize] No localizations found: model=${model.uid}, id=${where.id}`);
+    if (!entity) {
+      strapi.log.debug(`[Strapi Localize] Entity not found: model=${model.uid}, id=${where.id}`);
+      return;
+    }
+
+    // PDF page 5: Skip if entry already has localizations (it might be a translation itself)
+    // We only want to translate the SOURCE entry, not the translated versions
+    if (entity.localizations && entity.localizations.length > 0) {
+      strapi.log.debug(`[Strapi Localize] Skipping - entry already has localizations (might be a translation): model=${model.uid}, id=${where.id}`);
       return;
     }
 
@@ -42,6 +59,12 @@ module.exports = ({ strapi }) => {
     const targetLocaleCodes = targetLocales
       .filter(l => l.code !== currentLocale)
       .map(l => l.code);
+
+    // Check if there's only one locale (no point in translating)
+    if (targetLocaleCodes.length === 0) {
+      strapi.log.debug(`[Strapi Localize] Only one locale exists, skipping translation: model=${model.uid}, id=${where.id}`);
+      return;
+    }
 
     strapi.log.info(`[Strapi Localize] Auto-translate triggered: model=${model.uid}, id=${where.id}, source=${currentLocale}, targets=[${targetLocaleCodes.join(', ')}]`);
 
@@ -52,6 +75,10 @@ module.exports = ({ strapi }) => {
       if (targetLocale.code === currentLocale) {
         continue;
       }
+
+      // Mark this entry as being translated
+      const targetEntryKey = `${model.uid}:${where.id}:${targetLocale.code}`;
+      translatingEntries.add(targetEntryKey);
 
       try {
         await strapi
@@ -68,6 +95,9 @@ module.exports = ({ strapi }) => {
           `[Strapi Localize] Auto-translation failed: model=${model.uid}, id=${where.id}, target=${targetLocale.code}, error=${error.message}`
         );
         failCount++;
+      } finally {
+        // Remove from tracking after translation attempt
+        translatingEntries.delete(targetEntryKey);
       }
     }
 

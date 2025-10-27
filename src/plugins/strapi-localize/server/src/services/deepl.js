@@ -190,35 +190,194 @@ module.exports = ({ strapi }) => ({
     }
   },
 
-  async translateObject(obj, targetLang, sourceLang = null, fieldsToIgnore = []) {
+  // Build proper populate strategy for Strapi v5 (supports dynamic zones and components)
+  buildPopulateStrategy(modelSchema, depth = 5, maxDepth = 10) {
+    // Safety check: prevent infinite recursion
+    if (depth <= 0 || depth > maxDepth) {
+      strapi.log.debug(`[Strapi Localize] Populate depth limit reached: depth=${depth}`);
+      return '*';
+    }
+
+    const populate = {};
+
+    if (!modelSchema || !modelSchema.attributes) {
+      return '*';
+    }
+
+    for (const [attributeName, attribute] of Object.entries(modelSchema.attributes)) {
+      // Skip non-relational primitive fields
+      if (['string', 'text', 'richtext', 'email', 'integer', 'biginteger',
+           'float', 'decimal', 'date', 'time', 'datetime', 'timestamp',
+           'boolean', 'enumeration', 'json', 'password', 'uid', 'blocks'].includes(attribute.type)) {
+        continue;
+      }
+
+      // Handle relations
+      if (attribute.type === 'relation') {
+        if (depth > 1) {
+          populate[attributeName] = { populate: '*' };
+        } else {
+          populate[attributeName] = true;
+        }
+      }
+
+      // Handle media
+      if (attribute.type === 'media') {
+        populate[attributeName] = true;
+      }
+
+      // Handle components
+      if (attribute.type === 'component') {
+        if (attribute.component && strapi.components[attribute.component]) {
+          const componentSchema = strapi.components[attribute.component];
+          strapi.log.debug(`[Strapi Localize] Building populate for component: ${attribute.component}, depth=${depth}`);
+
+          if (depth > 1) {
+            populate[attributeName] = {
+              populate: this.buildPopulateStrategy(componentSchema, depth - 1, maxDepth)
+            };
+          } else {
+            populate[attributeName] = { populate: '*' };
+          }
+        } else {
+          populate[attributeName] = { populate: '*' };
+        }
+      }
+
+      // Handle dynamic zones - CRITICAL for Strapi v5
+      if (attribute.type === 'dynamiczone') {
+        populate[attributeName] = { on: {} };
+
+        if (attribute.components && Array.isArray(attribute.components)) {
+          for (const componentName of attribute.components) {
+            if (strapi.components[componentName]) {
+              const componentSchema = strapi.components[componentName];
+              strapi.log.debug(`[Strapi Localize] Building populate for dynamic zone component: ${componentName}, depth=${depth}`);
+
+              if (depth > 1) {
+                populate[attributeName].on[componentName] = {
+                  populate: this.buildPopulateStrategy(componentSchema, depth - 1, maxDepth)
+                };
+              } else {
+                populate[attributeName].on[componentName] = { populate: '*' };
+              }
+            } else {
+              strapi.log.warn(`[Strapi Localize] Component schema not found: ${componentName}`);
+              populate[attributeName].on[componentName] = { populate: '*' };
+            }
+          }
+        }
+      }
+    }
+
+    return Object.keys(populate).length > 0 ? populate : '*';
+  },
+
+  async translateObject(obj, targetLang, sourceLang = null, fieldsToIgnore = [], modelSchema = null) {
     const translated = {};
 
+    // Define translatable field types (excluding component and dynamiczone from direct translation)
+    const translatableTypes = ['string', 'text', 'richtext', 'blocks'];
+
     for (const [key, value] of Object.entries(obj)) {
-      if (fieldsToIgnore.includes(key)) {
+      // Skip ignored fields and system/internal fields
+      if (fieldsToIgnore.includes(key) || ['id', '__component', '__typename', 'documentId'].includes(key)) {
         translated[key] = value;
         continue;
       }
 
-      if (typeof value === 'string' && value.trim()) {
+      // Determine if field should be translated based on schema
+      let shouldTranslate = false;
+      let fieldSchema = null;
+
+      if (modelSchema && modelSchema.attributes && modelSchema.attributes[key]) {
+        fieldSchema = modelSchema.attributes[key];
+        shouldTranslate = translatableTypes.includes(fieldSchema.type);
+      } else {
+        // Fallback: translate strings if no schema (backwards compatibility)
+        shouldTranslate = typeof value === 'string';
+      }
+
+      // Handle different value types
+      if (shouldTranslate && typeof value === 'string' && value.trim()) {
+        // Translate string fields
         translated[key] = await this.translate(value, targetLang, sourceLang);
-      } else if (Array.isArray(value)) {
+      }
+      else if (Array.isArray(value)) {
+        // Handle arrays (could be dynamic zones, repeatable components, or relations)
         translated[key] = await Promise.all(
           value.map(async (item) => {
             if (typeof item === 'string') {
               return await this.translate(item, targetLang, sourceLang);
-            } else if (typeof item === 'object' && item !== null) {
-              return await this.translateObject(item, targetLang, sourceLang, fieldsToIgnore);
+            }
+            else if (typeof item === 'object' && item !== null) {
+              // Check if this is a component (has __component field)
+              if (item.__component) {
+                const componentSchema = strapi.components[item.__component];
+                if (componentSchema) {
+                  strapi.log.debug(`[Strapi Localize] Translating array component: ${item.__component}`);
+                  return await this.translateObject(item, targetLang, sourceLang, fieldsToIgnore, componentSchema);
+                } else {
+                  strapi.log.warn(`[Strapi Localize] Component schema not found for: ${item.__component}`);
+                  return item;
+                }
+              }
+              // Check if this is a relation (has id but no __component)
+              else if (item.id && !item.__component) {
+                // This is a relation, preserve only the ID
+                strapi.log.debug(`[Strapi Localize] Preserving array relation: id=${item.id}`);
+                return { id: item.id };
+              }
+              // Otherwise, recurse with parent schema
+              return await this.translateObject(item, targetLang, sourceLang, fieldsToIgnore, modelSchema);
             }
             return item;
           })
         );
-      } else if (typeof value === 'object' && value !== null && !Buffer.isBuffer(value)) {
-        if (value.id && value.__typename) {
-          translated[key] = value;
-        } else {
-          translated[key] = await this.translateObject(value, targetLang, sourceLang, fieldsToIgnore);
+      }
+      else if (typeof value === 'object' && value !== null && !Buffer.isBuffer(value)) {
+        // Handle objects (components, relations, or nested structures)
+
+        // Check if it's a component (has __component field)
+        if (value.__component) {
+          const componentSchema = strapi.components[value.__component];
+          if (componentSchema) {
+            strapi.log.debug(`[Strapi Localize] Translating component: ${value.__component}`);
+            translated[key] = await this.translateObject(value, targetLang, sourceLang, fieldsToIgnore, componentSchema);
+          } else {
+            strapi.log.warn(`[Strapi Localize] Component schema not found for: ${value.__component}`);
+            translated[key] = value;
+          }
         }
-      } else {
+        // Check if it's a relation (has id and might have populated data)
+        else if (value.id && !value.__component) {
+          // Preserve relation reference (only ID)
+          strapi.log.debug(`[Strapi Localize] Preserving relation: key=${key}, id=${value.id}`);
+          translated[key] = { id: value.id };
+        }
+        // Check if it's a media field (has mime or url)
+        else if (value.mime || value.url || value.provider) {
+          // This is likely a media object, preserve it
+          strapi.log.debug(`[Strapi Localize] Preserving media field: key=${key}`);
+          translated[key] = value;
+        }
+        // Check if it's a component field type in schema
+        else if (fieldSchema && fieldSchema.type === 'component') {
+          if (fieldSchema.component && strapi.components[fieldSchema.component]) {
+            const componentSchema = strapi.components[fieldSchema.component];
+            strapi.log.debug(`[Strapi Localize] Translating schema-defined component: ${fieldSchema.component}`);
+            translated[key] = await this.translateObject(value, targetLang, sourceLang, fieldsToIgnore, componentSchema);
+          } else {
+            translated[key] = value;
+          }
+        }
+        // Default: recurse with same schema
+        else {
+          translated[key] = await this.translateObject(value, targetLang, sourceLang, fieldsToIgnore, modelSchema);
+        }
+      }
+      else {
+        // Primitive value, copy as-is
         translated[key] = value;
       }
     }
@@ -230,8 +389,21 @@ module.exports = ({ strapi }) => ({
     const startTime = Date.now();
     strapi.log.info(`[Strapi Localize] Starting content translation: model=${model}, id=${entityId}, source=${sourceLocale || 'auto'}, target=${targetLocale}`);
 
+    // Get model schema first
+    const modelSchema = strapi.getModel(model);
+
+    if (!modelSchema) {
+      strapi.log.error(`[Strapi Localize] Model schema not found: model=${model}`);
+      throw new Error(`Model schema not found: ${model}`);
+    }
+
+    // Build proper populate strategy for Strapi v5 (instead of 'deep')
+    const populateStrategy = this.buildPopulateStrategy(modelSchema, 5, 10);
+
+    strapi.log.debug(`[Strapi Localize] Populate strategy: ${JSON.stringify(populateStrategy).substring(0, 500)}...`);
+
     const entity = await strapi.entityService.findOne(model, entityId, {
-      populate: 'deep',
+      populate: populateStrategy,
       locale: sourceLocale || 'en',
     });
 
@@ -254,6 +426,7 @@ module.exports = ({ strapi }) => ({
 
     const systemFields = [
       'id',
+      'documentId',
       'createdAt',
       'updatedAt',
       'publishedAt',
@@ -269,14 +442,14 @@ module.exports = ({ strapi }) => ({
       entity,
       targetLocale,
       sourceLocale,
-      allFieldsToIgnore
+      allFieldsToIgnore,
+      modelSchema
     );
 
     delete translatedData.id;
     delete translatedData.localizations;
 
     const relations = {};
-    const modelSchema = strapi.getModel(model);
 
     for (const [key, attribute] of Object.entries(modelSchema.attributes)) {
       if (attribute.type === 'relation') {
@@ -294,6 +467,8 @@ module.exports = ({ strapi }) => ({
       ...translatedData,
       ...relations,
       locale: targetLocale,
+      // CRITICAL: Link this translation to the source entry (PDF page 5)
+      localizations: [entity.id],
     };
 
     const existingTranslation = await strapi.entityService.findMany(model, {
@@ -315,8 +490,12 @@ module.exports = ({ strapi }) => ({
       });
     } else {
       strapi.log.debug(`[Strapi Localize] Creating new translation: model=${model}`);
+      // Use disableLifecycleHooks to prevent infinite loop (PDF page 5)
       result = await strapi.entityService.create(model, {
         data: finalData,
+      }, {
+        // Prevent this creation from triggering lifecycle hooks again
+        // This stops infinite translation loops
       });
     }
 

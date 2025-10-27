@@ -1,3 +1,1 @@
-const pluginId = 'strapi-localize';
-
-export default pluginId;
+export const PLUGIN_ID = 'strapi-localize';
