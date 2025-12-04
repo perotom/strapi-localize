@@ -1,305 +1,586 @@
-# Strapi Localize - DeepL Translation Plugin for Strapi v5
+# Strapi Localize
 
-A powerful Strapi v5 plugin that provides automatic content translation using DeepL's AI-powered translation service. Seamlessly integrate multilingual capabilities into your Strapi CMS with just a few clicks.
+A powerful Strapi v5 plugin that automatically translates your content using the DeepL API. This plugin seamlessly integrates with Strapi's internationalization (i18n) system to provide high-quality translations across all your localized content.
 
-## 🚀 What Can This Plugin Do?
+## 🌟 Key Features
 
 - **🔄 Automatic Translation**: Automatically translate content when created or updated
-- **📦 Batch Operations**: Translate multiple content items simultaneously
-- **🎯 Smart Field Selection**: Choose which fields to translate and which to preserve
-- **🔗 Relation Preservation**: Maintains all content relationships during translation
-- **🌍 Multi-locale Support**: Works with all DeepL-supported languages
-- **⚙️ Flexible Configuration**: Per-content-type settings for maximum control
-- **💼 Free & Pro Support**: Compatible with both DeepL Free and Pro API plans
+- **📦 Batch Translation**: Translate multiple content items at once through the admin panel
+- **🎯 Field-Level Control**: Configure which fields should be ignored during translation
+- **⚙️ Content Type Configuration**: Enable/disable translation for specific content types
+- **🔗 Relation Handling**: Properly maintains relations when translating content
+- **💼 DeepL Integration**: Supports both Free and Pro DeepL API plans
+- **🎨 Admin UI**: User-friendly interface for managing translations and settings
 
-## 📋 Prerequisites
+## 📋 Requirements
 
-- **Node.js**: v18.x to v20.x
-- **Strapi**: v5.0.0 or higher
-- **DeepL API Key**: Free or Pro account ([Get one here](https://www.deepl.com/pro-api))
-- **i18n Plugin**: Strapi Internationalization plugin must be installed and configured
+- Strapi v5.0.0 or higher
+- Node.js v18.x to v22.x
+- DeepL API key (Free or Pro)
+- i18n plugin enabled and configured
 
-## 🛠️ Installation
+## 🚀 Installation
 
-### Step 1: Create a New Strapi Project (Skip if you have one)
-
-```bash
-npx create-strapi@latest my-project --quickstart
-cd my-project
-```
-
-### Step 2: Enable Internationalization
-
-1. Install the i18n plugin if not already installed:
-```bash
-npm install @strapi/plugin-i18n
-```
-
-2. Configure locales in your Strapi admin panel:
-   - Go to **Settings → Internationalization**
-   - Add the languages you want to support
-
-### Step 3: Install the DeepL Translation Plugin
-
-#### Option A: From this repository (Development)
-
-1. Clone this repository:
-```bash
-git clone https://github.com/perotom/strapi-localize.git
-cd strapi-localize
-```
-
-2. Copy the plugin to your Strapi project:
-```bash
-cp -r src/plugins/strapi-deepl-translate /path/to/your-strapi-project/src/plugins/
-```
-
-3. Install plugin dependencies:
-```bash
-cd /path/to/your-strapi-project
-npm install axios
-```
-
-#### Option B: As a package (When published)
+### From GitHub
 
 ```bash
-npm install strapi-deepl-translate
+npm install github:perotom/strapi-localize
+# or
+yarn add github:perotom/strapi-localize
 ```
 
-### Step 4: Enable the Plugin
+### From NPM
 
-Create or update `config/plugins.js`:
+```bash
+npm install strapi-localize
+# or
+yarn add strapi-localize
+```
+
+After installation, enable the plugin in your Strapi project's `config/plugins.js` (or `config/plugins.ts`):
 
 ```javascript
 module.exports = {
-  'strapi-deepl-translate': {
+  'strapi-localize': {
     enabled: true,
   },
-  // ... other plugins
 };
 ```
 
-### Step 5: Rebuild Admin Panel
+Then rebuild your admin panel and restart Strapi:
 
 ```bash
 npm run build
 npm run develop
 ```
 
-## 🎯 User Flow & Configuration
+### From Source (Development)
 
-### Initial Setup
+For development or customization, you can install from source:
 
-1. **Get Your DeepL API Key**
-   - Sign up at [DeepL Pro](https://www.deepl.com/pro-api)
-   - Choose Free (500,000 chars/month) or Pro plan
-   - Copy your authentication key from the account settings
-
-2. **Configure the Plugin**
-   - Navigate to **Settings → DeepL Translate** in your Strapi admin
-   - Enter your DeepL API key
-   - Click "Test Connection" to verify
-   - Save your settings
-
-### Setting Up Content Types for Translation
-
-1. **Enable i18n for Your Content Types**
-   - Go to **Content-Type Builder**
-   - Edit your content type
-   - Go to Advanced Settings
-   - Enable "Internationalization"
-
-2. **Configure Translation Settings**
-   - Return to **Settings → DeepL Translate**
-   - For each content type:
-     - ✅ **Enable translation**: Toggle on
-     - 🔄 **Auto-translate**: Enable automatic translation on save
-     - 🚫 **Ignored fields**: Select fields that shouldn't be translated (e.g., slugs, IDs, technical fields)
-
-### Using the Translation Features
-
-#### Manual Batch Translation
-
-1. Navigate to **DeepL Translate** in the main menu
-2. Select your content type from the dropdown
-3. Choose the target language
-4. Select content items to translate (checkbox)
-5. Click "Translate Selected"
-
-#### Automatic Translation
-
-When enabled, content automatically translates when:
-- Creating new content in the default locale
-- Updating existing content
-- Publishing drafts
-
-#### Field Exclusion
-
-To exclude specific fields from translation:
-
-1. Go to **Settings → DeepL Translate**
-2. Find your content type
-3. In "Fields to ignore", select:
-   - Technical fields (slugs, IDs)
-   - Fields with specific formatting requirements
-   - Fields that should remain in the original language
-
-Example excluded fields:
-- `slug` - URL identifiers
-- `seo_keywords` - SEO-specific terms
-- `product_code` - Technical codes
-- `email` - Email addresses
-
-## 📝 Complete Usage Example
-
-Let's say you have a blog with articles in English that you want to translate to German and French:
-
-### 1. Prepare Your Content Type
-
-```javascript
-// Your article content type should have:
-{
-  "title": "string",          // ✅ Will be translated
-  "content": "richtext",      // ✅ Will be translated
-  "excerpt": "text",          // ✅ Will be translated
-  "slug": "string",           // ❌ Can be excluded
-  "author": "relation",       // 🔗 Relation preserved
-  "category": "relation",     // 🔗 Relation preserved
-  "featured_image": "media"   // 📷 Media preserved
-}
+1. Clone or copy the plugin folder to your Strapi project:
+```bash
+git clone https://github.com/perotom/strapi-localize.git
+cp -r strapi-localize /path/to/your-strapi-project/src/plugins/
 ```
 
-### 2. Configure the Plugin
+2. Enable the plugin in `config/plugins.js`:
 
 ```javascript
-// Settings configuration
+module.exports = {
+  'strapi-localize': {
+    enabled: true,
+    resolve: './src/plugins/strapi-localize'
+  },
+};
+```
+
+3. Install dependencies and rebuild:
+```bash
+cd /path/to/your-strapi-project
+npm install
+npm run build
+npm run develop
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+The plugin requires one environment variable for security:
+
+```bash
+# .env
+DEEPL_ENCRYPTION_KEY=your-strong-secret-key-min-32-chars  # Required for API key encryption
+```
+
+**Important Security Notes:**
+- The `DEEPL_ENCRYPTION_KEY` is **required** to encrypt API keys stored in the database
+- Use a strong, random key (minimum 32 characters)
+- Never commit encryption keys to version control
+- If not set, the plugin will use Strapi's `admin.apiToken.salt` as fallback
+- **The DeepL API key itself is configured via the admin UI, not environment variables**
+
+### Getting a DeepL API Key
+
+1. Sign up for a DeepL account at [deepl.com](https://www.deepl.com/pro-api)
+2. Choose your plan:
+   - **Free**: 500,000 characters/month (API keys end with `:fx`)
+   - **Pro**: Unlimited usage with pay-as-you-go pricing
+3. Copy your API key from the account settings
+
+**Note**: The plugin automatically detects Free vs Pro API keys based on the `:fx` suffix and uses the correct API endpoint.
+
+### Permissions & Access Control
+
+The plugin implements role-based access control (RBAC) for all operations:
+
+#### Permission Actions
+
+1. **`plugin::strapi-localize.settings.read`**
+   - View plugin settings
+   - Test API connection
+   - List available languages
+   - View content types
+
+2. **`plugin::strapi-localize.settings.update`**
+   - Modify plugin configuration
+   - Update API key
+   - Change content type settings
+   - Sync glossaries
+
+3. **`plugin::strapi-localize.translate`**
+   - Perform single translations
+   - Execute batch translations
+
+#### Configuring Permissions
+
+**Via Strapi Admin Panel:**
+1. Navigate to **Settings > Administration Panel > Roles**
+2. Select a role (Editor, Author, etc.)
+3. Expand **Plugins > Strapi Localize**
+4. Check/uncheck desired permissions
+5. Save changes
+
+**Example Configuration:**
+```javascript
+// Recommended role setup
+Super Admin:    ✓ settings.read  ✓ settings.update  ✓ translate
+Editor:         ✓ settings.read  ✗ settings.update  ✓ translate
+Author:         ✗ settings.read  ✗ settings.update  ✓ translate
+Translator:     ✗ settings.read  ✗ settings.update  ✓ translate
+```
+
+**Security Best Practices:**
+- Only grant `settings.update` to trusted administrators
+- API key changes should be restricted to Super Admins
+- Content editors should only have `translate` permission
+- Audit permission changes regularly
+
+### Plugin Settings Page
+
+After installation, navigate to **Settings > Strapi Localize** in your Strapi admin panel:
+
+#### Global Settings
+- **API Key**: Enter your DeepL API authentication key here (securely encrypted in database)
+- **Test Connection**: Verify your API key is valid before saving
+- **Auto-Translation**: Enable/disable automatic translation globally
+
+**Note**: The API key is stored encrypted in the database and can only be changed through this admin interface.
+
+#### Content Type Settings
+For each content type with i18n enabled:
+- **Enable Translation**: Allow this content type to be translated
+- **Auto-Translate**: Automatically translate on create/update
+- **Ignored Fields**: Select fields that should not be translated
+
+## 📖 Detailed Usage Guide
+
+### Preparing Content Types
+
+1. **Enable i18n for Your Content Type**
+
+```javascript
+// In your content type schema
 {
-  apiKey: "your-deepl-api-key",
-  contentTypes: {
-    "api::article.article": {
-      enabled: true,
-      autoTranslate: true,
-      ignoredFields: ["slug", "seo_meta"]
+  "pluginOptions": {
+    "i18n": {
+      "localized": true
     }
   }
 }
 ```
 
-### 3. Create Content
+2. **Configure Field Types**
 
-1. Create an article in English
-2. Fill in all fields
-3. Save the article
+The plugin automatically detects and translates these field types:
+- `string` - Short text
+- `text` - Long text
+- `richtext` - HTML/Markdown content
+- `blocks` - Dynamic zones and components
 
-### 4. Automatic Translation
+### Manual Translation Workflow
 
-If auto-translate is enabled:
-- The article is automatically translated to German and French
-- Relations to author and category are maintained
-- The slug field remains unchanged
-- Featured image is preserved
+#### Single Item Translation
 
-### 5. Manual Translation
+1. Navigate to your content manager
+2. Select an item to translate
+3. Use the plugin's API or admin interface
+4. Choose target language(s)
+5. Review and save translated content
 
-For existing content:
-1. Go to **DeepL Translate**
-2. Select "Article" content type
-3. Choose "German" as target language
-4. Select articles to translate
+#### Batch Translation
+
+1. Go to **Strapi Localize** in the admin menu
+2. Select content type
+3. Choose target language
+4. Select multiple items using checkboxes
 5. Click "Translate Selected"
+6. Monitor progress in real-time
 
-## 🔌 API Usage
+### Automatic Translation
 
-### Translate Single Item
+When enabled, the plugin automatically translates content:
 
-```bash
-curl -X POST http://localhost:1337/api/deepl-translate/translate \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "id": 1,
-    "model": "api::article.article",
-    "targetLocale": "de",
-    "sourceLocale": "en"
-  }'
+```javascript
+// Lifecycle hooks trigger on:
+- afterCreate: New content in default locale
+- afterUpdate: Updated content fields
+- beforePublish: Draft to published state
 ```
 
-### Translate Multiple Items
+### Field Exclusion Strategies
 
-```bash
-curl -X POST http://localhost:1337/api/deepl-translate/translate-batch \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "ids": [1, 2, 3],
-    "model": "api::article.article",
-    "targetLocale": "fr",
-    "sourceLocale": "en"
-  }'
+#### Via Admin UI
+
+1. Go to **Settings → Strapi Localize**
+2. Select your content type
+3. In "Fields to ignore", choose fields like:
+   - `slug` - URL paths
+   - `seo_keywords` - SEO terms
+   - `product_sku` - Product codes
+   - `external_id` - External references
+
+#### Via Configuration
+
+```javascript
+// In your plugin configuration
+{
+  contentTypes: {
+    "api::article.article": {
+      enabled: true,
+      autoTranslate: true,
+      ignoredFields: ["slug", "seo_description", "canonical_url"]
+    }
+  }
+}
 ```
 
-### Get Available Languages
+#### Via Field Schema (Advanced)
 
-```bash
-curl -X GET http://localhost:1337/api/deepl-translate/languages \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```javascript
+// In your content type schema
+{
+  "attributes": {
+    "title": {
+      "type": "string",
+      "pluginOptions": {
+        "strapi-localize": {
+          "translatable": true
+        }
+      }
+    },
+    "slug": {
+      "type": "string",
+      "pluginOptions": {
+        "strapi-localize": {
+          "translatable": false // Never translate this field
+        }
+      }
+    }
+  }
+}
 ```
 
-## 🎨 Supported Field Types
+## 🔌 API Reference
 
-| Field Type | Translated | Notes |
-|------------|------------|-------|
-| string | ✅ | Short text fields |
-| text | ✅ | Long text fields |
-| richtext | ✅ | Formatted content |
-| blocks | ✅ | Dynamic zones |
-| relation | 🔗 | Preserved as-is |
-| media | 📷 | Preserved as-is |
-| number | 🔢 | Preserved as-is |
-| boolean | ⚡ | Preserved as-is |
-| json | 📊 | Depends on content |
-| date | 📅 | Preserved as-is |
+### REST API Endpoints
 
-## ⚡ Performance Considerations
+#### Translate Single Content
 
-- **Rate Limits**: DeepL Free allows 500,000 characters/month
-- **Batch Size**: Process up to 50 items at once for optimal performance
-- **Caching**: Translations are stored in Strapi's database
-- **Async Processing**: Large batches are processed asynchronously
+```http
+POST /api/strapi-localize/translate
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
 
-## 🔒 Security Best Practices
+{
+  "id": 1,
+  "model": "api::article.article",
+  "targetLocale": "de",
+  "sourceLocale": "en"
+}
+```
 
-1. **API Key Storage**: Store your DeepL API key securely
-2. **Access Control**: Configure proper permissions for translation endpoints
-3. **Field Validation**: Always validate which fields should be translated
-4. **Rate Limiting**: Implement rate limiting for API endpoints
+**Response:**
+```json
+{
+  "id": 42,
+  "title": "Übersetzter Titel",
+  "content": "Übersetzter Inhalt...",
+  "locale": "de",
+  "localizations": [{"id": 1, "locale": "en"}]
+}
+```
 
-## 🐛 Troubleshooting
+#### Batch Translation
 
-### Plugin Not Appearing in Admin Panel
-- Ensure the plugin is enabled in `config/plugins.js`
-- Rebuild the admin panel: `npm run build`
-- Clear browser cache
+```http
+POST /api/strapi-localize/translate-batch
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
 
-### Translation Not Working
-- Verify DeepL API key is correct
-- Check if content type has i18n enabled
-- Ensure target locale exists in Strapi
-- Verify you have remaining DeepL quota
+{
+  "ids": [1, 2, 3, 4, 5],
+  "model": "api::article.article",
+  "targetLocale": "fr",
+  "sourceLocale": "en"
+}
+```
 
-### Fields Not Being Excluded
-- Check field names match exactly
-- Save settings after making changes
-- Verify fields are listed in ignored fields
+**Response:**
+```json
+[
+  {"id": 43, "status": "success", "locale": "fr"},
+  {"id": 44, "status": "success", "locale": "fr"},
+  {"id": 45, "status": "success", "locale": "fr"}
+]
+```
 
-### Relations Lost After Translation
-- Ensure relations exist in the source content
-- Check that related entities are published
-- Verify relation field names haven't changed
+#### Get Available Languages
+
+```http
+GET /api/strapi-localize/languages
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+**Response:**
+```json
+[
+  {"language": "DE", "name": "German"},
+  {"language": "FR", "name": "French"},
+  {"language": "ES", "name": "Spanish"},
+  {"language": "IT", "name": "Italian"}
+]
+```
+
+#### Get/Update Settings
+
+```http
+GET /api/strapi-localize/settings
+PUT /api/strapi-localize/settings
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+### JavaScript SDK Usage
+
+```javascript
+// In your custom code
+const translationService = strapi.plugin('strapi-localize').service('deepl');
+
+// Translate a single field
+const translatedText = await translationService.translate(
+  'Hello World',
+  'de',
+  'en'
+);
+
+// Translate an entire object
+const translatedObject = await translationService.translateObject(
+  { title: 'Hello', content: 'World' },
+  'fr',
+  'en',
+  ['id', 'slug'] // Fields to ignore
+);
+
+// Translate content entity
+const translatedContent = await translationService.translateContent(
+  entityId,
+  'api::article.article',
+  'es',
+  'en'
+);
+```
+
+## 🎯 Use Cases & Examples
+
+### E-commerce Product Catalog
+
+```javascript
+// Product content type
+{
+  "name": "string",           // ✅ Translate
+  "description": "richtext",  // ✅ Translate
+  "price": "decimal",         // 🔢 Preserve
+  "sku": "string",            // ❌ Ignore
+  "category": "relation",     // 🔗 Maintain
+  "images": "media"           // 📷 Preserve
+}
+
+// Configuration
+{
+  "api::product.product": {
+    enabled: true,
+    autoTranslate: true,
+    ignoredFields: ["sku", "barcode", "manufacturer_id"]
+  }
+}
+```
+
+### Multi-language Blog
+
+```javascript
+// Article content type
+{
+  "title": "string",
+  "content": "richtext",
+  "excerpt": "text",
+  "slug": "uid",
+  "author": "relation",
+  "tags": "relation"
+}
+
+// Workflow
+1. Author writes in English
+2. Auto-translate to DE, FR, ES on save
+3. Editors review translations
+4. Publish all locales simultaneously
+```
+
+### Documentation Site
+
+```javascript
+// Documentation page
+{
+  "title": "string",
+  "content": "blocks",  // Dynamic zones
+  "code_examples": "text",  // Ignore
+  "api_reference": "json",  // Ignore
+  "version": "string"       // Ignore
+}
+
+// Settings
+ignoredFields: ["code_examples", "api_reference", "version"]
+```
+
+## 🔧 Advanced Configuration
+
+### Custom Translation Rules
+
+```javascript
+// In your plugin extension
+module.exports = {
+  async beforeTranslate(content, targetLocale, sourceLocale) {
+    // Pre-process content before translation
+    if (content.title && targetLocale === 'de') {
+      // Add custom prefix for German titles
+      content.title = `[DE] ${content.title}`;
+    }
+    return content;
+  },
+
+  async afterTranslate(content, targetLocale, sourceLocale) {
+    // Post-process translated content
+    if (targetLocale === 'fr') {
+      // Ensure French formatting
+      content.content = content.content.replace(/\$/g, '€');
+    }
+    return content;
+  }
+};
+```
+
+### Performance Optimization
+
+```javascript
+// config/plugins.js
+module.exports = {
+  'strapi-localize': {
+    enabled: true,
+    config: {
+      batchSize: 25,        // Items per batch
+      timeout: 30000,       // API timeout (ms)
+      retryAttempts: 3,     // Retry failed translations
+      cacheEnabled: true,   // Cache translations
+      cacheTTL: 3600       // Cache TTL in seconds
+    }
+  }
+};
+```
+
+## 🐛 Troubleshooting Guide
+
+### Common Issues and Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Plugin not appearing | Not enabled | Check `config/plugins.js` and rebuild |
+| API key invalid | Wrong key or plan | Verify key in DeepL dashboard |
+| Fields not translating | Field type unsupported | Check supported field types |
+| Relations broken | Invalid reference | Ensure relations exist in target locale |
+| Timeout errors | Large content | Reduce batch size or increase timeout |
+| Character limit reached | Free plan limit | Upgrade to Pro or wait for reset |
+
+### Debug Mode
+
+Enable debug logging:
+
+```javascript
+// config/plugins.js
+{
+  'strapi-localize': {
+    enabled: true,
+    config: {
+      debug: true // Enable detailed logging
+    }
+  }
+}
+```
+
+### Health Check
+
+```bash
+# Check plugin status
+curl http://localhost:1337/api/strapi-localize/health
+
+# Test API connection
+curl -X POST http://localhost:1337/api/strapi-localize/test-connection \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## 🔄 Migration Guide
+
+### From Other Translation Plugins
+
+```javascript
+// Export existing translations
+const oldTranslations = await strapi
+  .plugin('old-translation-plugin')
+  .service('export')
+  .exportAll();
+
+// Import to Strapi Localize
+for (const item of oldTranslations) {
+  await strapi
+    .plugin('strapi-localize')
+    .service('deepl')
+    .translateContent(
+      item.id,
+      item.model,
+      item.locale,
+      item.sourceLocale
+    );
+}
+```
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/perotom/strapi-localize.git
+
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+```
 
 ## 📄 License
 
@@ -307,20 +588,27 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## 🆘 Support
 
-- **Documentation**: [Plugin README](src/plugins/strapi-deepl-translate/README.md)
 - **Issues**: [GitHub Issues](https://github.com/perotom/strapi-localize/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/perotom/strapi-localize/discussions)
 - **Discord**: [Strapi Community](https://discord.strapi.io/)
 
 ## 🚦 Roadmap
 
-- [ ] Support for custom translation providers
-- [ ] Translation queue management
-- [ ] Translation history and rollback
-- [ ] Bulk translation scheduling
-- [ ] Translation quality settings
-- [ ] Cost estimation calculator
-- [ ] Webhook support for translation events
+### Version 2.0
+- [ ] OpenAI/GPT translation support
+- [ ] Google Translate integration
+- [ ] Custom translation providers API
+
+### Version 2.1
+- [ ] Translation memory database
+- [ ] Glossary/term management
+- [ ] Translation quality scoring
+
+### Version 3.0
+- [ ] Real-time collaborative translation
+- [ ] Translation workflow management
+- [ ] A/B testing for translations
 
 ---
 
-Made with ❤️ for the Strapi Community
+Made with ❤️ by the Strapi Community

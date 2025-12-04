@@ -4,107 +4,98 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Strapi v5 plugin project that provides automatic content translation capabilities using the DeepL API. The main component is the `strapi-deepl-translate` plugin located in `src/plugins/strapi-deepl-translate/`.
+This is a Strapi v5 plugin that provides automatic content translation using the DeepL API. The plugin can be installed from npm or directly from GitHub.
 
 ## Repository Structure
 
 ```
 strapi-localize/
-├── src/plugins/strapi-deepl-translate/  # Main translation plugin
-│   ├── admin/                           # React-based admin UI
-│   │   └── src/
-│   │       ├── pages/Settings/          # Plugin configuration UI
-│   │       └── pages/HomePage/          # Batch translation interface
-│   ├── server/                          # Node.js backend
-│   │   ├── services/                    # Business logic
-│   │   │   ├── deepl.js                # DeepL API integration
-│   │   │   └── settings.js             # Settings management
-│   │   ├── controllers/                 # HTTP endpoints
-│   │   ├── routes/                      # Route definitions
-│   │   ├── middlewares/                 # Lifecycle hooks
-│   │   └── bootstrap.js                # Plugin initialization
-│   └── package.json                     # Plugin dependencies
+├── admin/                    # React-based admin UI
+│   └── src/
+│       ├── index.js          # Admin plugin entry point
+│       ├── pluginId.js       # Plugin ID constant
+│       ├── pages/Settings/   # Plugin configuration UI
+│       ├── pages/HomePage/   # Batch translation interface
+│       └── translations/     # i18n translations
+├── server/                   # Node.js backend
+│   └── src/
+│       ├── index.js          # Server entry point
+│       ├── bootstrap.js      # Plugin initialization
+│       ├── services/         # Business logic (deepl.js, settings.js)
+│       ├── controllers/      # HTTP endpoints
+│       ├── routes/           # Route definitions
+│       └── middlewares/      # Lifecycle hooks
+├── dist/                     # Compiled distribution (committed for GitHub installs)
+├── package.json              # Plugin package configuration
+├── strapi-admin.js           # Local dev admin entry
+└── strapi-server.js          # Local dev server entry
+```
+
+## Development Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Build the plugin
+npm run build
+
+# Verify package for distribution
+npm run verify
+
+# Watch mode for development
+npm run watch
+
+# Run tests
+npm test
+```
+
+## Installation Methods
+
+### From GitHub (direct)
+```bash
+npm install github:perotom/strapi-localize
+```
+
+### From npm (when published)
+```bash
+npm install strapi-localize
+```
+
+### Enable in Strapi
+```javascript
+// config/plugins.js
+module.exports = {
+  'strapi-localize': {
+    enabled: true,
+  },
+};
 ```
 
 ## Key Components
 
-### DeepL Translation Service (`server/services/deepl.js`)
+### DeepL Translation Service (`server/src/services/deepl.js`)
 - Handles all DeepL API communication
 - Supports both Free and Pro API endpoints
 - Translates content recursively while preserving relations
 - Respects field-level ignore configuration
 
-### Settings Management (`server/services/settings.js`)
+### Settings Management (`server/src/services/settings.js`)
 - Stores configuration in Strapi's plugin store
 - Manages per-content-type settings
-- Handles field exclusion lists
+- Handles API key encryption (AES-256-CBC)
 
-### Lifecycle Hooks (`server/middlewares/lifecycle.js`)
+### Lifecycle Hooks (`server/src/middlewares/lifecycle.js`)
 - Automatically triggers translation on content create/update
 - Only processes i18n-enabled content types
 - Respects auto-translate configuration
-
-### Admin UI Components
-- **Settings Page**: Configure API key, content types, and ignored fields
-- **HomePage**: Batch translation interface with content selection
-- Uses Strapi Design System components
-
-## Development Commands
-
-Since this is a plugin meant to be integrated into a Strapi project:
-
-```bash
-# To use the plugin in a Strapi project:
-1. Copy plugin to Strapi's src/plugins/ directory
-2. Install dependencies: npm install axios
-3. Enable in config/plugins.js
-4. Rebuild admin: npm run build
-5. Start Strapi: npm run develop
-```
-
-## Testing the Plugin
-
-```bash
-# Test DeepL connection
-curl -X POST http://localhost:1337/api/deepl-translate/test-connection
-
-# Translate content
-curl -X POST http://localhost:1337/api/deepl-translate/translate \
-  -H "Content-Type: application/json" \
-  -d '{"id": 1, "model": "api::article.article", "targetLocale": "de"}'
-```
-
-## Important Technical Details
-
-### Field Translation Logic
-- Automatically translates: `string`, `text`, `richtext`, `blocks`
-- Preserves: relations, media, numbers, dates, booleans
-- System fields always ignored: `id`, `createdAt`, `updatedAt`, `publishedAt`, `locale`
-- Custom ignored fields configured per content type
-
-### API Integration
-- Attempts Free API first (api-free.deepl.com)
-- Falls back to Pro API (api.deepl.com) on 403 error
-- Handles rate limiting gracefully
-- Logs errors without breaking the application
-
-### Relation Handling
-- Relations are preserved by extracting and maintaining IDs
-- Supports both single and multiple relations
-- Does not translate related content (only the current entity)
-
-### Auto-Translation Trigger
-- Uses Strapi's lifecycle hooks (afterCreate, afterUpdate)
-- Delayed by 1 second to allow for database transactions
-- Only triggers for content with localizations
-- Skips if auto-translate is disabled
 
 ## Configuration Structure
 
 ```javascript
 {
-  apiKey: "string",           // DeepL API key
-  autoTranslate: boolean,     // Global setting
+  apiKey: "string",           // DeepL API key (encrypted)
+  autoTranslate: boolean,     // Global auto-translate setting
   contentTypes: {
     "api::model.model": {
       enabled: boolean,       // Translation enabled
@@ -115,21 +106,7 @@ curl -X POST http://localhost:1337/api/deepl-translate/translate \
 }
 ```
 
-## Common Issues and Solutions
-
-1. **Plugin not appearing**: Rebuild admin panel with `npm run build`
-2. **API key issues**: Test connection in Settings page
-3. **Fields not translating**: Check if field type is supported
-4. **Relations broken**: Ensure related entities exist in target locale
-
 ## GitHub Repository
 
 - Repository: https://github.com/perotom/strapi-localize
 - Issues: https://github.com/perotom/strapi-localize/issues
-
-## Notes for Future Development
-
-- Consider caching translations to reduce API calls
-- Add support for custom translation providers
-- Implement translation queue for large batch operations
-- Add translation history and rollback functionality

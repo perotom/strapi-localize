@@ -1,0 +1,38 @@
+# Source files (only dist is needed)
+admin/
+server/
+
+# Development files
+strapi-admin.js
+strapi-server.js
+jest.config.js
+.editorconfig
+.eslintignore
+.prettierrc
+.prettierignore
+
+# Documentation not needed in package
+SECURITY.md
+CONTRIBUTING.md
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test files
+**/__tests__/
+**/*.test.js
+**/*.spec.js
+coverage/
+
+# Development dependencies
+node_modules/
+
+# Lock files (users should use their own)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
