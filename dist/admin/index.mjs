@@ -37,8 +37,10 @@ const index = {
             defaultMessage: "Settings"
           },
           id: "settings",
-          to: `/settings/${PLUGIN_ID}`,
-          Component: () => import("../_chunks/index-BdCKxWjJ.mjs")
+          to: PLUGIN_ID,
+          Component: () => import("../_chunks/index-BdCKxWjJ.mjs").then((mod) => ({
+            default: mod.default
+          }))
         }
       ]
     );

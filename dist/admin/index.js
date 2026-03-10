@@ -38,8 +38,10 @@ const index = {
             defaultMessage: "Settings"
           },
           id: "settings",
-          to: `/settings/${PLUGIN_ID}`,
-          Component: () => Promise.resolve().then(() => require("../_chunks/index-DKcLv0JU.js"))
+          to: PLUGIN_ID,
+          Component: () => Promise.resolve().then(() => require("../_chunks/index-DKcLv0JU.js")).then((mod) => ({
+            default: mod.default
+          }))
         }
       ]
     );

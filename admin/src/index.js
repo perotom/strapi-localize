@@ -23,8 +23,10 @@ export default {
             defaultMessage: 'Settings',
           },
           id: 'settings',
-          to: `/settings/${PLUGIN_ID}`,
-          Component: () => import('./pages/Settings'),
+          to: PLUGIN_ID,
+          Component: () => import('./pages/Settings').then((mod) => ({
+            default: mod.default,
+          })),
         },
       ]
     );
