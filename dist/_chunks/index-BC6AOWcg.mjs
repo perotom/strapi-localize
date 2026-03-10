@@ -1,7 +1,7 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { Box, Loader, Typography, Grid, Card, CardHeader, CardBody, CardContent, Flex, TextInput, Button, Toggle, Alert, MultiSelect, MultiSelectOption, Table, Thead, Tr, Th, Tbody, Td, IconButton } from "@strapi/design-system";
-import { Check, ExclamationMarkCircle, Plus, Trash } from "@strapi/icons";
+import { Check, WarningCircle, Plus, Trash } from "@strapi/icons";
 import { useFetchClient, useNotification } from "@strapi/strapi/admin";
 import { useIntl } from "react-intl";
 const Settings = () => {
@@ -227,7 +227,7 @@ const Settings = () => {
               /* @__PURE__ */ jsx(Check, { color: "success" }),
               /* @__PURE__ */ jsx(Typography, { textColor: "success600", children: "Connected" })
             ] }) : /* @__PURE__ */ jsxs(Flex, { gap: 1, alignItems: "center", children: [
-              /* @__PURE__ */ jsx(ExclamationMarkCircle, { color: "danger" }),
+              /* @__PURE__ */ jsx(WarningCircle, { color: "danger" }),
               /* @__PURE__ */ jsx(Typography, { textColor: "danger600", children: "Connection failed" })
             ] }) })
           ] }),

@@ -39,7 +39,7 @@ const index = {
           id: "settings",
           to: `/settings/${PLUGIN_ID}`,
           Component: async () => {
-            const component = await import("../_chunks/index-4XaIkW_7.mjs");
+            const component = await import("../_chunks/index-BC6AOWcg.mjs");
             return component;
           }
         }

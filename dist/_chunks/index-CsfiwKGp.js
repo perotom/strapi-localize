@@ -229,7 +229,7 @@ const Settings = () => {
               /* @__PURE__ */ jsxRuntime.jsx(icons.Check, { color: "success" }),
               /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { textColor: "success600", children: "Connected" })
             ] }) : /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { gap: 1, alignItems: "center", children: [
-              /* @__PURE__ */ jsxRuntime.jsx(icons.ExclamationMarkCircle, { color: "danger" }),
+              /* @__PURE__ */ jsxRuntime.jsx(icons.WarningCircle, { color: "danger" }),
               /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { textColor: "danger600", children: "Connection failed" })
             ] }) })
           ] }),

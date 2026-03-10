@@ -25,7 +25,7 @@ import {
   Select,
   Option,
 } from '@strapi/design-system';
-import { Check, ExclamationMarkCircle, Trash, Plus } from '@strapi/icons';
+import { Check, WarningCircle, Trash, Plus } from '@strapi/icons';
 import { useFetchClient, useNotification } from '@strapi/strapi/admin';
 import { useIntl } from 'react-intl';
 
@@ -291,7 +291,7 @@ const Settings = () => {
                         </Flex>
                       ) : (
                         <Flex gap={1} alignItems="center">
-                          <ExclamationMarkCircle color="danger" />
+                          <WarningCircle color="danger" />
                           <Typography textColor="danger600">
                             Connection failed
                           </Typography>
