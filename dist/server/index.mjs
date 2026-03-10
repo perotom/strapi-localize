@@ -157,43 +157,45 @@ var bootstrap = async ({ strapi }) => {
     process.nextTick(() => {
       setTimeout(async () => {
         try {
-          const translationService = strapi.plugin("strapi-localize").service("translation");
-          const settingsService = strapi.plugin("strapi-localize").service("settings");
-          const i18nService = strapi.plugin("strapi-localize").service("i18n");
-          const settings2 = await settingsService.getSettings();
-          if (!settings2.autoTranslate) {
-            strapi.log.debug(`[Strapi Localize] Auto-translate disabled globally`);
-            return;
-          }
-          const contentTypeSettings = settings2.contentTypes?.[cleanEvent.model.uid];
-          if (!contentTypeSettings?.enabled || !contentTypeSettings?.autoTranslate) {
-            strapi.log.debug(`[Strapi Localize] Auto-translate not enabled for ${cleanEvent.model.uid}`);
-            return;
-          }
-          const allLocales = await i18nService.getLocales();
-          const targetLocales = allLocales.filter((l) => l.code !== cleanEvent.result.locale);
-          if (targetLocales.length === 0) {
-            return;
-          }
-          strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${cleanEvent.model.uid}, documentId=${cleanEvent.result.documentId}, source=${cleanEvent.result.locale}, targets=[${targetLocales.map((l) => l.code).join(", ")}]`);
-          let successCount = 0;
-          let failCount = 0;
-          for (const targetLocale of targetLocales) {
-            try {
-              await translationService.translateContent(
-                cleanEvent.result.documentId,
-                cleanEvent.model.uid,
-                targetLocale.code,
-                cleanEvent.result.locale
-              );
-              strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
-              successCount++;
-            } catch (error) {
-              strapi.log.error(`[Strapi Localize] Auto-translation failed: target=${targetLocale.code}, error=${error.message}`);
-              failCount++;
+          await strapi.db.transaction(async () => {
+            const translationService = strapi.plugin("strapi-localize").service("translation");
+            const settingsService = strapi.plugin("strapi-localize").service("settings");
+            const i18nService = strapi.plugin("strapi-localize").service("i18n");
+            const settings2 = await settingsService.getSettings();
+            if (!settings2.autoTranslate) {
+              strapi.log.debug(`[Strapi Localize] Auto-translate disabled globally`);
+              return;
             }
-          }
-          strapi.log.info(`[Strapi Localize] Auto-translate completed: successful=${successCount}, failed=${failCount}`);
+            const contentTypeSettings = settings2.contentTypes?.[cleanEvent.model.uid];
+            if (!contentTypeSettings?.enabled || !contentTypeSettings?.autoTranslate) {
+              strapi.log.debug(`[Strapi Localize] Auto-translate not enabled for ${cleanEvent.model.uid}`);
+              return;
+            }
+            const allLocales = await i18nService.getLocales();
+            const targetLocales = allLocales.filter((l) => l.code !== cleanEvent.result.locale);
+            if (targetLocales.length === 0) {
+              return;
+            }
+            strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${cleanEvent.model.uid}, documentId=${cleanEvent.result.documentId}, source=${cleanEvent.result.locale}, targets=[${targetLocales.map((l) => l.code).join(", ")}]`);
+            let successCount = 0;
+            let failCount = 0;
+            for (const targetLocale of targetLocales) {
+              try {
+                await translationService.translateContent(
+                  cleanEvent.result.documentId,
+                  cleanEvent.model.uid,
+                  targetLocale.code,
+                  cleanEvent.result.locale
+                );
+                strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
+                successCount++;
+              } catch (error) {
+                strapi.log.error(`[Strapi Localize] Auto-translation failed: target=${targetLocale.code}, error=${error.message}`);
+                failCount++;
+              }
+            }
+            strapi.log.info(`[Strapi Localize] Auto-translate completed: successful=${successCount}, failed=${failCount}`);
+          });
         } catch (error) {
           strapi.log.error(`[Strapi Localize] Error in ${hookType} hook: ${error.message}`);
         }
