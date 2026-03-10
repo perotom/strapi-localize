@@ -22,6 +22,29 @@ const index = {
       name: PLUGIN_ID,
       isReady: true
     });
+    app.createSettingSection(
+      {
+        id: PLUGIN_ID,
+        intlLabel: {
+          id: `${PLUGIN_ID}.plugin.name`,
+          defaultMessage: "Strapi Localize"
+        }
+      },
+      [
+        {
+          intlLabel: {
+            id: `${PLUGIN_ID}.plugin.settings`,
+            defaultMessage: "Settings"
+          },
+          id: "settings",
+          to: `/settings/${PLUGIN_ID}`,
+          Component: async () => {
+            const component = await import("../_chunks/index-4XaIkW_7.mjs");
+            return component;
+          }
+        }
+      ]
+    );
   },
   async registerTrads({ locales }) {
     return Promise.all(

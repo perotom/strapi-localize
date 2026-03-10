@@ -7,6 +7,30 @@ export default {
       name: PLUGIN_ID,
       isReady: true,
     });
+
+    app.createSettingSection(
+      {
+        id: PLUGIN_ID,
+        intlLabel: {
+          id: `${PLUGIN_ID}.plugin.name`,
+          defaultMessage: 'Strapi Localize',
+        },
+      },
+      [
+        {
+          intlLabel: {
+            id: `${PLUGIN_ID}.plugin.settings`,
+            defaultMessage: 'Settings',
+          },
+          id: 'settings',
+          to: `/settings/${PLUGIN_ID}`,
+          Component: async () => {
+            const component = await import('./pages/Settings');
+            return component;
+          },
+        },
+      ]
+    );
   },
 
   async registerTrads({ locales }) {

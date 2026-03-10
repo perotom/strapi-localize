@@ -26,7 +26,7 @@ import {
   Option,
 } from '@strapi/design-system';
 import { Check, ExclamationMarkCircle, Trash, Plus } from '@strapi/icons';
-import { useFetchClient, useNotification } from '@strapi/helper-plugin';
+import { useFetchClient, useNotification } from '@strapi/strapi/admin';
 import { useIntl } from 'react-intl';
 
 const Settings = () => {
