@@ -114,7 +114,7 @@ function requireLifecycle() {
 }
 var bootstrap = async ({ strapi }) => {
   strapi.log.info("[Strapi Localize] Plugin initializing...");
-  const lifecycleMiddleware = requireLifecycle()({ strapi });
+  requireLifecycle()({ strapi });
   const recentTranslations = /* @__PURE__ */ new Map();
   const DEBOUNCE_MS = 3e3;
   const localizableModels = Object.keys(strapi.contentTypes).filter((key) => {
@@ -158,12 +158,50 @@ var bootstrap = async ({ strapi }) => {
       }
     }
     strapi.log.debug(`[Strapi Localize] Scheduling translation from ${hookType}: ${translationKey}`);
-    setImmediate(() => {
-      setTimeout(() => {
-        lifecycleMiddleware.translateOnUpdate(cleanEvent).catch((error) => {
+    process.nextTick(() => {
+      setTimeout(async () => {
+        try {
+          const translationService = strapi.plugin("strapi-localize").service("translation");
+          const settingsService = strapi.plugin("strapi-localize").service("settings");
+          const i18nService = strapi.plugin("strapi-localize").service("i18n");
+          const settings2 = await settingsService.getSettings();
+          if (!settings2.autoTranslate) {
+            strapi.log.debug(`[Strapi Localize] Auto-translate disabled globally`);
+            return;
+          }
+          const contentTypeSettings = settings2.contentTypes?.[cleanEvent.model.uid];
+          if (!contentTypeSettings?.enabled || !contentTypeSettings?.autoTranslate) {
+            strapi.log.debug(`[Strapi Localize] Auto-translate not enabled for ${cleanEvent.model.uid}`);
+            return;
+          }
+          const allLocales = await i18nService.getLocales();
+          const targetLocales = allLocales.filter((l) => l.code !== cleanEvent.result.locale);
+          if (targetLocales.length === 0) {
+            return;
+          }
+          strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${cleanEvent.model.uid}, documentId=${cleanEvent.result.documentId}, source=${cleanEvent.result.locale}, targets=[${targetLocales.map((l) => l.code).join(", ")}]`);
+          let successCount = 0;
+          let failCount = 0;
+          for (const targetLocale of targetLocales) {
+            try {
+              await translationService.translateContent(
+                cleanEvent.result.documentId,
+                cleanEvent.model.uid,
+                targetLocale.code,
+                cleanEvent.result.locale
+              );
+              strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
+              successCount++;
+            } catch (error) {
+              strapi.log.error(`[Strapi Localize] Auto-translation failed: target=${targetLocale.code}, error=${error.message}`);
+              failCount++;
+            }
+          }
+          strapi.log.info(`[Strapi Localize] Auto-translate completed: successful=${successCount}, failed=${failCount}`);
+        } catch (error) {
           strapi.log.error(`[Strapi Localize] Error in ${hookType} hook: ${error.message}`);
-        });
-      }, 2e3);
+        }
+      }, 3e3);
     });
   };
   strapi.db.lifecycles.subscribe({
