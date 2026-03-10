@@ -120,8 +120,10 @@ module.exports = ({ strapi }) => ({
 
     return await this.retryWithBackoff(async () => {
       const response = await axios.get(`${baseUrl}/v2/languages`, {
+        headers: {
+          'Authorization': `DeepL-Auth-Key ${apiKey}`,
+        },
         params: {
-          auth_key: apiKey,
           type: 'target',
         },
       });
@@ -145,14 +147,13 @@ module.exports = ({ strapi }) => ({
       throw new Error('DeepL API key not configured');
     }
 
-    const params = {
-      auth_key: apiKey,
-      text: text,
+    const data = {
+      text: [text],
       target_lang: targetLang.toUpperCase(),
     };
 
     if (sourceLang) {
-      params.source_lang = sourceLang.toUpperCase();
+      data.source_lang = sourceLang.toUpperCase();
     }
 
     // Get glossary ID for the language pair
@@ -164,7 +165,7 @@ module.exports = ({ strapi }) => ({
     const glossaryId = glossaryIds[langPairKey];
 
     if (glossaryId) {
-      params.glossary_id = glossaryId;
+      data.glossary_id = glossaryId;
       strapi.log.debug(`[Strapi Localize] Using glossary: id=${glossaryId}, lang_pair=${langPairKey}`);
     }
 
@@ -176,8 +177,11 @@ module.exports = ({ strapi }) => ({
 
     try {
       return await this.retryWithBackoff(async () => {
-        const response = await axios.post(`${baseUrl}/v2/translate`, null, {
-          params,
+        const response = await axios.post(`${baseUrl}/v2/translate`, data, {
+          headers: {
+            'Authorization': `DeepL-Auth-Key ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
         });
 
         const duration = Date.now() - startTime;

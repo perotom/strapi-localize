@@ -682,8 +682,10 @@ var deepl = ({ strapi }) => ({
     strapi.log.info(`[Strapi Localize] Fetching available languages from DeepL: api_type=${isFree ? "free" : "pro"}`);
     return await this.retryWithBackoff(async () => {
       const response = await axios.get(`${baseUrl}/v2/languages`, {
+        headers: {
+          "Authorization": `DeepL-Auth-Key ${apiKey}`
+        },
         params: {
-          auth_key: apiKey,
           type: "target"
         }
       });
@@ -702,13 +704,12 @@ var deepl = ({ strapi }) => ({
       strapi.log.error("[Strapi Localize] DeepL API key not configured");
       throw new Error("DeepL API key not configured");
     }
-    const params = {
-      auth_key: apiKey,
-      text,
+    const data = {
+      text: [text],
       target_lang: targetLang.toUpperCase()
     };
     if (sourceLang) {
-      params.source_lang = sourceLang.toUpperCase();
+      data.source_lang = sourceLang.toUpperCase();
     }
     const settingsService = strapi.plugin("strapi-localize").service("settings");
     const settings2 = await settingsService.getSettings();
@@ -716,7 +717,7 @@ var deepl = ({ strapi }) => ({
     const langPairKey = `${(sourceLang || "en").toLowerCase()}_${targetLang.toLowerCase()}`;
     const glossaryId = glossaryIds[langPairKey];
     if (glossaryId) {
-      params.glossary_id = glossaryId;
+      data.glossary_id = glossaryId;
       strapi.log.debug(`[Strapi Localize] Using glossary: id=${glossaryId}, lang_pair=${langPairKey}`);
     }
     const isFree = this.isFreeApiKey(apiKey);
@@ -725,8 +726,11 @@ var deepl = ({ strapi }) => ({
     strapi.log.debug(`[Strapi Localize] Translating text: source=${sourceLang || "auto"}, target=${targetLang}, length=${text.length}, preview="${textPreview}"`);
     try {
       return await this.retryWithBackoff(async () => {
-        const response = await axios.post(`${baseUrl}/v2/translate`, null, {
-          params
+        const response = await axios.post(`${baseUrl}/v2/translate`, data, {
+          headers: {
+            "Authorization": `DeepL-Auth-Key ${apiKey}`,
+            "Content-Type": "application/json"
+          }
         });
         const duration = Date.now() - startTime;
         const translatedText = response.data.translations[0].text;
