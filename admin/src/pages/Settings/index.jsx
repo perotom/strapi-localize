@@ -9,13 +9,13 @@ import {
   Checkbox,
   Divider,
   Grid,
-  Main,
-  HeaderLayout,
-  ContentLayout,
   Badge,
 } from '@strapi/design-system';
-import { Check, Cross } from '@strapi/icons';
-import { useFetchClient, useNotification } from '@strapi/strapi/admin';
+import {
+  useFetchClient,
+  useNotification,
+  Layouts,
+} from '@strapi/strapi/admin';
 
 const Settings = () => {
   const { get, put, post } = useFetchClient();
@@ -121,19 +121,19 @@ const Settings = () => {
 
   if (isLoading) {
     return (
-      <Main>
-        <ContentLayout>
+      <Layouts.Root>
+        <Layouts.Content>
           <Box padding={8}>
             <Typography>Loading settings...</Typography>
           </Box>
-        </ContentLayout>
-      </Main>
+        </Layouts.Content>
+      </Layouts.Root>
     );
   }
 
   return (
-    <Main>
-      <HeaderLayout
+    <Layouts.Root>
+      <Layouts.Header
         title="Strapi Localize"
         subtitle="Automatic content translation using DeepL"
         primaryAction={
@@ -142,7 +142,7 @@ const Settings = () => {
           </Button>
         }
       />
-      <ContentLayout>
+      <Layouts.Content>
         <Flex direction="column" gap={6}>
           {/* API Configuration */}
           <Box background="neutral0" padding={6} shadow="filterShadow" hasRadius>
@@ -265,8 +265,8 @@ const Settings = () => {
             </Flex>
           </Box>
         </Flex>
-      </ContentLayout>
-    </Main>
+      </Layouts.Content>
+    </Layouts.Root>
   );
 };
 

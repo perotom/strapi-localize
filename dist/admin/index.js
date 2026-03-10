@@ -39,7 +39,7 @@ const index = {
           },
           id: "settings",
           to: PLUGIN_ID,
-          Component: () => Promise.resolve().then(() => require("../_chunks/index-DXgEWtUd.js")).then((mod) => ({
+          Component: () => Promise.resolve().then(() => require("../_chunks/index-0AoG_BRY.js")).then((mod) => ({
             default: mod.default
           }))
         }

@@ -1,8 +1,7 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
-import { Main, ContentLayout, Box, Typography, HeaderLayout, Button, Flex, Grid, Field, TextInput, Badge, Divider, Checkbox } from "@strapi/design-system";
-import "@strapi/icons";
-import { useFetchClient, useNotification } from "@strapi/strapi/admin";
+import { Box, Typography, Button, Flex, Grid, Field, TextInput, Badge, Divider, Checkbox } from "@strapi/design-system";
+import { useFetchClient, useNotification, Layouts } from "@strapi/strapi/admin";
 const Settings = () => {
   const { get, put, post } = useFetchClient();
   const { toggleNotification } = useNotification();
@@ -97,18 +96,18 @@ const Settings = () => {
     }));
   };
   if (isLoading) {
-    return /* @__PURE__ */ jsx(Main, { children: /* @__PURE__ */ jsx(ContentLayout, { children: /* @__PURE__ */ jsx(Box, { padding: 8, children: /* @__PURE__ */ jsx(Typography, { children: "Loading settings..." }) }) }) });
+    return /* @__PURE__ */ jsx(Layouts.Root, { children: /* @__PURE__ */ jsx(Layouts.Content, { children: /* @__PURE__ */ jsx(Box, { padding: 8, children: /* @__PURE__ */ jsx(Typography, { children: "Loading settings..." }) }) }) });
   }
-  return /* @__PURE__ */ jsxs(Main, { children: [
+  return /* @__PURE__ */ jsxs(Layouts.Root, { children: [
     /* @__PURE__ */ jsx(
-      HeaderLayout,
+      Layouts.Header,
       {
         title: "Strapi Localize",
         subtitle: "Automatic content translation using DeepL",
         primaryAction: /* @__PURE__ */ jsx(Button, { onClick: handleSave, loading: isSaving, children: "Save" })
       }
     ),
-    /* @__PURE__ */ jsx(ContentLayout, { children: /* @__PURE__ */ jsxs(Flex, { direction: "column", gap: 6, children: [
+    /* @__PURE__ */ jsx(Layouts.Content, { children: /* @__PURE__ */ jsxs(Flex, { direction: "column", gap: 6, children: [
       /* @__PURE__ */ jsx(Box, { background: "neutral0", padding: 6, shadow: "filterShadow", hasRadius: true, children: /* @__PURE__ */ jsxs(Flex, { direction: "column", gap: 4, children: [
         /* @__PURE__ */ jsx(Typography, { variant: "delta", fontWeight: "bold", children: "DeepL API Configuration" }),
         /* @__PURE__ */ jsxs(Grid.Root, { gap: 4, children: [

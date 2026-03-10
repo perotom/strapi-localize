@@ -3,7 +3,6 @@ Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 const jsxRuntime = require("react/jsx-runtime");
 const react = require("react");
 const designSystem = require("@strapi/design-system");
-require("@strapi/icons");
 const admin = require("@strapi/strapi/admin");
 const Settings = () => {
   const { get, put, post } = admin.useFetchClient();
@@ -99,18 +98,18 @@ const Settings = () => {
     }));
   };
   if (isLoading) {
-    return /* @__PURE__ */ jsxRuntime.jsx(designSystem.Main, { children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.ContentLayout, { children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { padding: 8, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { children: "Loading settings..." }) }) }) });
+    return /* @__PURE__ */ jsxRuntime.jsx(admin.Layouts.Root, { children: /* @__PURE__ */ jsxRuntime.jsx(admin.Layouts.Content, { children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { padding: 8, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { children: "Loading settings..." }) }) }) });
   }
-  return /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Main, { children: [
+  return /* @__PURE__ */ jsxRuntime.jsxs(admin.Layouts.Root, { children: [
     /* @__PURE__ */ jsxRuntime.jsx(
-      designSystem.HeaderLayout,
+      admin.Layouts.Header,
       {
         title: "Strapi Localize",
         subtitle: "Automatic content translation using DeepL",
         primaryAction: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { onClick: handleSave, loading: isSaving, children: "Save" })
       }
     ),
-    /* @__PURE__ */ jsxRuntime.jsx(designSystem.ContentLayout, { children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { direction: "column", gap: 6, children: [
+    /* @__PURE__ */ jsxRuntime.jsx(admin.Layouts.Content, { children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { direction: "column", gap: 6, children: [
       /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { background: "neutral0", padding: 6, shadow: "filterShadow", hasRadius: true, children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { direction: "column", gap: 4, children: [
         /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "delta", fontWeight: "bold", children: "DeepL API Configuration" }),
         /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Grid.Root, { gap: 4, children: [
