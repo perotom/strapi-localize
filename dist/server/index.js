@@ -20,7 +20,7 @@ var bootstrap = async ({ strapi }) => {
     }
     const item = translationQueue.shift();
     if (!item) return;
-    const { uid, documentId, locale, queuedAt } = item;
+    const { uid, documentId, sourceLocale, queuedAt } = item;
     const translationKey = `${uid}:${documentId}`;
     if (processingSet.has(translationKey)) {
       strapi.log.debug(`[Strapi Localize] Already processing: ${translationKey}`);
@@ -28,7 +28,7 @@ var bootstrap = async ({ strapi }) => {
     }
     processingSet.add(translationKey);
     try {
-      strapi.log.info(`[Strapi Localize] Processing queued translation: ${translationKey}`);
+      strapi.log.info(`[Strapi Localize] Processing queued translation: ${translationKey} (source: ${sourceLocale})`);
       const translationService = strapi.plugin("strapi-localize").service("translation");
       const settingsService = strapi.plugin("strapi-localize").service("settings");
       const i18nService = strapi.plugin("strapi-localize").service("i18n");
@@ -43,11 +43,11 @@ var bootstrap = async ({ strapi }) => {
         return;
       }
       const allLocales = await i18nService.getLocales();
-      const targetLocales = allLocales.filter((l) => l.code !== locale);
+      const targetLocales = allLocales.filter((l) => l.code !== sourceLocale);
       if (targetLocales.length === 0) {
         return;
       }
-      strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${uid}, documentId=${documentId}, source=${locale}, targets=[${targetLocales.map((l) => l.code).join(", ")}]`);
+      strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${uid}, documentId=${documentId}, source=${sourceLocale}, targets=[${targetLocales.map((l) => l.code).join(", ")}]`);
       let successCount = 0;
       let failCount = 0;
       for (const targetLocale of targetLocales) {
@@ -56,7 +56,8 @@ var bootstrap = async ({ strapi }) => {
             documentId,
             uid,
             targetLocale.code,
-            locale
+            sourceLocale
+            // Always translate FROM the default/source locale
           );
           strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
           successCount++;
@@ -87,19 +88,28 @@ var bootstrap = async ({ strapi }) => {
   if (localizableModels.length > 0) {
     strapi.log.debug(`[Strapi Localize] Localizable models: ${localizableModels.join(", ")}`);
   }
+  let defaultLocale = null;
+  const initDefaultLocale = async () => {
+    try {
+      defaultLocale = await strapi.plugin("i18n").service("locales").getDefaultLocale();
+      strapi.log.info(`[Strapi Localize] Default locale: ${defaultLocale}`);
+    } catch (error) {
+      strapi.log.error(`[Strapi Localize] Failed to get default locale: ${error.message}`);
+      defaultLocale = "en";
+    }
+  };
+  initDefaultLocale();
   const scheduleTranslation = (event, hookType) => {
     const { model, result } = event;
     if (!result || !result.documentId) {
       return;
     }
-    const cleanEvent = {
-      model: { uid: model.uid },
-      result: {
-        documentId: result.documentId,
-        locale: result.locale
-      }
-    };
-    const translationKey = `${model.uid}:${result.documentId}:${result.locale}`;
+    const editedLocale = result.locale;
+    if (editedLocale !== defaultLocale) {
+      strapi.log.debug(`[Strapi Localize] Skipping ${hookType} - edited locale '${editedLocale}' is not the default locale '${defaultLocale}'`);
+      return;
+    }
+    const translationKey = `${model.uid}:${result.documentId}`;
     const lastTranslation = recentTranslations.get(translationKey);
     if (lastTranslation && Date.now() - lastTranslation < DEBOUNCE_MS) {
       strapi.log.debug(`[Strapi Localize] Debouncing ${hookType} for ${translationKey}`);
@@ -114,11 +124,11 @@ var bootstrap = async ({ strapi }) => {
         }
       }
     }
-    strapi.log.debug(`[Strapi Localize] Queuing translation from ${hookType}: ${translationKey}`);
+    strapi.log.info(`[Strapi Localize] Queuing translation from ${hookType}: ${translationKey} (source: ${defaultLocale})`);
     translationQueue.push({
-      uid: cleanEvent.model.uid,
-      documentId: cleanEvent.result.documentId,
-      locale: cleanEvent.result.locale,
+      uid: model.uid,
+      documentId: result.documentId,
+      sourceLocale: defaultLocale,
       queuedAt: Date.now()
     });
   };

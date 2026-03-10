@@ -30,7 +30,7 @@ module.exports = async ({ strapi }) => {
     const item = translationQueue.shift();
     if (!item) return;
 
-    const { uid, documentId, locale, queuedAt } = item;
+    const { uid, documentId, sourceLocale, queuedAt } = item;
     const translationKey = `${uid}:${documentId}`;
 
     // Skip if already processing
@@ -42,7 +42,7 @@ module.exports = async ({ strapi }) => {
     processingSet.add(translationKey);
 
     try {
-      strapi.log.info(`[Strapi Localize] Processing queued translation: ${translationKey}`);
+      strapi.log.info(`[Strapi Localize] Processing queued translation: ${translationKey} (source: ${sourceLocale})`);
 
       const translationService = strapi.plugin('strapi-localize').service('translation');
       const settingsService = strapi.plugin('strapi-localize').service('settings');
@@ -61,15 +61,15 @@ module.exports = async ({ strapi }) => {
         return;
       }
 
-      // Get all target locales
+      // Get all target locales (all locales except the source/default locale)
       const allLocales = await i18nService.getLocales();
-      const targetLocales = allLocales.filter(l => l.code !== locale);
+      const targetLocales = allLocales.filter(l => l.code !== sourceLocale);
 
       if (targetLocales.length === 0) {
         return;
       }
 
-      strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${uid}, documentId=${documentId}, source=${locale}, targets=[${targetLocales.map(l => l.code).join(', ')}]`);
+      strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${uid}, documentId=${documentId}, source=${sourceLocale}, targets=[${targetLocales.map(l => l.code).join(', ')}]`);
 
       let successCount = 0;
       let failCount = 0;
@@ -80,7 +80,7 @@ module.exports = async ({ strapi }) => {
             documentId,
             uid,
             targetLocale.code,
-            locale
+            sourceLocale  // Always translate FROM the default/source locale
           );
           strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
           successCount++;
@@ -123,9 +123,26 @@ module.exports = async ({ strapi }) => {
     strapi.log.debug(`[Strapi Localize] Localizable models: ${localizableModels.join(', ')}`);
   }
 
+  // Cache for default locale (fetched once at startup)
+  let defaultLocale = null;
+
+  // Get default locale on startup
+  const initDefaultLocale = async () => {
+    try {
+      defaultLocale = await strapi.plugin('i18n').service('locales').getDefaultLocale();
+      strapi.log.info(`[Strapi Localize] Default locale: ${defaultLocale}`);
+    } catch (error) {
+      strapi.log.error(`[Strapi Localize] Failed to get default locale: ${error.message}`);
+      defaultLocale = 'en'; // Fallback
+    }
+  };
+
+  // Initialize default locale
+  initDefaultLocale();
+
   /**
    * Schedule translation outside of the database transaction context
-   * Creates a clean event object without transaction references
+   * Only triggers when the DEFAULT locale is edited
    */
   const scheduleTranslation = (event, hookType) => {
     const { model, result } = event;
@@ -134,16 +151,16 @@ module.exports = async ({ strapi }) => {
       return;
     }
 
-    // Create a clean event copy without transaction references
-    const cleanEvent = {
-      model: { uid: model.uid },
-      result: {
-        documentId: result.documentId,
-        locale: result.locale,
-      },
-    };
+    const editedLocale = result.locale;
 
-    const translationKey = `${model.uid}:${result.documentId}:${result.locale}`;
+    // IMPORTANT: Only translate when the SOURCE (default) locale is edited
+    // Editing translations should NOT trigger re-translation
+    if (editedLocale !== defaultLocale) {
+      strapi.log.debug(`[Strapi Localize] Skipping ${hookType} - edited locale '${editedLocale}' is not the default locale '${defaultLocale}'`);
+      return;
+    }
+
+    const translationKey = `${model.uid}:${result.documentId}`;
 
     // Check if we recently scheduled a translation for this entry (debounce)
     const lastTranslation = recentTranslations.get(translationKey);
@@ -165,13 +182,14 @@ module.exports = async ({ strapi }) => {
       }
     }
 
-    strapi.log.debug(`[Strapi Localize] Queuing translation from ${hookType}: ${translationKey}`);
+    strapi.log.info(`[Strapi Localize] Queuing translation from ${hookType}: ${translationKey} (source: ${defaultLocale})`);
 
     // Add to queue - will be processed by the interval-based processor
+    // Always use defaultLocale as the source
     translationQueue.push({
-      uid: cleanEvent.model.uid,
-      documentId: cleanEvent.result.documentId,
-      locale: cleanEvent.result.locale,
+      uid: model.uid,
+      documentId: result.documentId,
+      sourceLocale: defaultLocale,
       queuedAt: Date.now(),
     });
   };
