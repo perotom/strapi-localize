@@ -10,6 +10,8 @@ import {
   CardBody,
   CardContent,
   Field,
+  Checkbox,
+  Divider,
 } from '@strapi/design-system';
 import { useFetchClient, useNotification } from '@strapi/strapi/admin';
 
@@ -22,6 +24,7 @@ const Settings = () => {
     contentTypes: {},
     autoTranslate: false,
   });
+  const [contentTypes, setContentTypes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
@@ -29,6 +32,7 @@ const Settings = () => {
 
   useEffect(() => {
     fetchSettings();
+    fetchContentTypes();
   }, []);
 
   const fetchSettings = async () => {
@@ -37,6 +41,15 @@ const Settings = () => {
       setSettings(response.data || response || {});
     } catch (error) {
       console.error('Failed to load settings:', error);
+    }
+  };
+
+  const fetchContentTypes = async () => {
+    try {
+      const response = await get('/strapi-localize/content-types');
+      setContentTypes(response.data || response || []);
+    } catch (error) {
+      console.error('Failed to load content types:', error);
     }
     setIsLoading(false);
   };
@@ -78,6 +91,32 @@ const Settings = () => {
     setIsTestingConnection(false);
   };
 
+  const handleContentTypeToggle = (contentTypeUid) => {
+    setSettings(prev => ({
+      ...prev,
+      contentTypes: {
+        ...prev.contentTypes,
+        [contentTypeUid]: {
+          ...prev.contentTypes?.[contentTypeUid],
+          enabled: !prev.contentTypes?.[contentTypeUid]?.enabled,
+        },
+      },
+    }));
+  };
+
+  const handleAutoTranslateToggle = (contentTypeUid) => {
+    setSettings(prev => ({
+      ...prev,
+      contentTypes: {
+        ...prev.contentTypes,
+        [contentTypeUid]: {
+          ...prev.contentTypes?.[contentTypeUid],
+          autoTranslate: !prev.contentTypes?.[contentTypeUid]?.autoTranslate,
+        },
+      },
+    }));
+  };
+
   if (isLoading) {
     return (
       <Box padding={8}>
@@ -93,6 +132,7 @@ const Settings = () => {
       </Typography>
 
       <Flex direction="column" gap={6}>
+        {/* API Configuration */}
         <Card>
           <CardHeader>
             <Typography variant="beta">API Configuration</Typography>
@@ -113,7 +153,7 @@ const Settings = () => {
                   <Field.Hint>Enter your DeepL API key (Free or Pro)</Field.Hint>
                 </Field.Root>
 
-                <Flex gap={2}>
+                <Flex gap={2} alignItems="center">
                   <Button
                     onClick={handleTestConnection}
                     loading={isTestingConnection}
@@ -124,11 +164,74 @@ const Settings = () => {
                   </Button>
                   {connectionStatus !== null && (
                     <Typography textColor={connectionStatus ? 'success600' : 'danger600'}>
-                      {connectionStatus ? 'Connected' : 'Connection failed'}
+                      {connectionStatus ? '✓ Connected' : '✗ Connection failed'}
                     </Typography>
                   )}
                 </Flex>
+
+                <Divider />
+
+                <Checkbox
+                  checked={settings.autoTranslate || false}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, autoTranslate: checked })
+                  }
+                >
+                  Enable global auto-translation (translate content automatically when saved)
+                </Checkbox>
               </Flex>
+            </CardContent>
+          </CardBody>
+        </Card>
+
+        {/* Content Type Configuration */}
+        <Card>
+          <CardHeader>
+            <Typography variant="beta">Content Type Configuration</Typography>
+          </CardHeader>
+          <CardBody>
+            <CardContent>
+              {contentTypes.length === 0 ? (
+                <Typography textColor="neutral600">
+                  No localizable content types found. Please ensure you have content types with i18n enabled.
+                </Typography>
+              ) : (
+                <Flex direction="column" gap={4}>
+                  {contentTypes.map((contentType) => {
+                    const ctSettings = settings.contentTypes?.[contentType.uid] || {};
+                    return (
+                      <Box key={contentType.uid} padding={4} background="neutral100" hasRadius>
+                        <Flex direction="column" gap={3}>
+                          <Typography variant="delta" fontWeight="bold">
+                            {contentType.displayName}
+                          </Typography>
+                          <Typography variant="pi" textColor="neutral600">
+                            {contentType.uid}
+                          </Typography>
+
+                          <Flex gap={4}>
+                            <Checkbox
+                              checked={ctSettings.enabled || false}
+                              onCheckedChange={() => handleContentTypeToggle(contentType.uid)}
+                            >
+                              Enable translation
+                            </Checkbox>
+
+                            {ctSettings.enabled && (
+                              <Checkbox
+                                checked={ctSettings.autoTranslate || false}
+                                onCheckedChange={() => handleAutoTranslateToggle(contentType.uid)}
+                              >
+                                Auto-translate on save
+                              </Checkbox>
+                            )}
+                          </Flex>
+                        </Flex>
+                      </Box>
+                    );
+                  })}
+                </Flex>
+              )}
             </CardContent>
           </CardBody>
         </Card>
