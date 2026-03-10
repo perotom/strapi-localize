@@ -1344,6 +1344,9 @@ var i18n = ({ strapi }) => ({
   },
   /**
    * Create a localization for an existing entry (v5 Documents API)
+   * In Strapi v5, all localizations of a document share the same documentId.
+   * We need to pass the documentId when creating to link the localization properly.
+   *
    * @param {string} uid - Content type UID
    * @param {object} baseEntry - Source entry (with documentId)
    * @param {object} newEntryData - Translated data
@@ -1352,10 +1355,17 @@ var i18n = ({ strapi }) => ({
    */
   async createLocalization(uid, baseEntry, newEntryData, targetLocale) {
     try {
-      strapi.log.debug(`[Strapi Localize] Creating localization: uid=${uid}, documentId=${baseEntry.documentId}, locale=${targetLocale}`);
+      const sourceDocumentId = baseEntry.documentId;
+      strapi.log.debug(`[Strapi Localize] Creating localization: uid=${uid}, documentId=${sourceDocumentId}, locale=${targetLocale}`);
+      const existingLocalization = await this.getExistingLocalization(uid, sourceDocumentId, targetLocale);
+      if (existingLocalization) {
+        strapi.log.warn(`[Strapi Localize] Localization already exists, updating instead: uid=${uid}, documentId=${sourceDocumentId}, locale=${targetLocale}`);
+        return this.updateLocalization(uid, sourceDocumentId, newEntryData, targetLocale);
+      }
       const cleanData = this.omitSystemFields(newEntryData);
       cleanData.publishedAt = null;
       const createdEntry = await strapi.documents(uid).create({
+        documentId: sourceDocumentId,
         locale: targetLocale,
         data: cleanData
       });

@@ -20,7 +20,7 @@ const index = {
     app.registerPlugin({
       id: PLUGIN_ID,
       name: PLUGIN_ID,
-      isReady: false
+      isReady: true
     });
   },
   async registerTrads({ locales }) {
