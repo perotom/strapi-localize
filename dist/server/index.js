@@ -523,15 +523,7 @@ var routes = {
         path: "/settings",
         handler: "settings.get",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.settings.read"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -539,15 +531,7 @@ var routes = {
         path: "/settings",
         handler: "settings.update",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.settings.update"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -555,15 +539,7 @@ var routes = {
         path: "/content-types",
         handler: "settings.getContentTypes",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.settings.read"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -571,15 +547,7 @@ var routes = {
         path: "/test-connection",
         handler: "settings.testConnection",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.settings.read"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -587,15 +555,7 @@ var routes = {
         path: "/translate",
         handler: "translate.translate",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.translate"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -603,15 +563,7 @@ var routes = {
         path: "/translate-batch",
         handler: "translate.translateBatch",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.translate"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -619,15 +571,7 @@ var routes = {
         path: "/languages",
         handler: "translate.getLanguages",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.settings.read"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -635,15 +579,7 @@ var routes = {
         path: "/sync-glossaries",
         handler: "settings.syncGlossaries",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.settings.update"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       },
       {
@@ -651,15 +587,7 @@ var routes = {
         path: "/list-glossaries",
         handler: "settings.listGlossaries",
         config: {
-          policies: [
-            "admin::isAuthenticatedAdmin",
-            {
-              name: "admin::hasPermissions",
-              config: {
-                actions: ["plugin::strapi-localize.settings.read"]
-              }
-            }
-          ]
+          policies: ["admin::isAuthenticatedAdmin"]
         }
       }
     ]

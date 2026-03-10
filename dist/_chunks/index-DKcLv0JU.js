@@ -9,7 +9,7 @@ const reactIntl = require("react-intl");
 const Settings = () => {
   const { formatMessage } = reactIntl.useIntl();
   const { get, put, post } = admin.useFetchClient();
-  const toggleNotification = admin.useNotification();
+  const { toggleNotification } = admin.useNotification();
   const [settings, setSettings] = react.useState({
     apiKey: "",
     contentTypes: {},

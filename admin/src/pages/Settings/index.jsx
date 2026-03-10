@@ -32,7 +32,7 @@ import { useIntl } from 'react-intl';
 const Settings = () => {
   const { formatMessage } = useIntl();
   const { get, put, post } = useFetchClient();
-  const toggleNotification = useNotification();
+  const { toggleNotification } = useNotification();
 
   const [settings, setSettings] = useState({
     apiKey: '',
