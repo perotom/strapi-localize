@@ -95,13 +95,9 @@ module.exports = ({ strapi }) => ({
     });
   },
   async getApiKey() {
-    const pluginStore = strapi.store({
-      environment: '',
-      type: 'plugin',
-      name: 'strapi-localize',
-    });
-
-    const settings = await pluginStore.get({ key: 'settings' });
+    // Use the settings service which handles decryption
+    const settingsService = strapi.plugin('strapi-localize').service('settings');
+    const settings = await settingsService.getSettings();
     return settings?.apiKey;
   },
 

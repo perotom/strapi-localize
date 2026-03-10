@@ -662,12 +662,8 @@ var deepl = ({ strapi }) => ({
     });
   },
   async getApiKey() {
-    const pluginStore = strapi.store({
-      environment: "",
-      type: "plugin",
-      name: "strapi-localize"
-    });
-    const settings2 = await pluginStore.get({ key: "settings" });
+    const settingsService = strapi.plugin("strapi-localize").service("settings");
+    const settings2 = await settingsService.getSettings();
     return settings2?.apiKey;
   },
   async getAvailableLanguages() {
