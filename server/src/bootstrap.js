@@ -3,32 +3,52 @@
 /**
  * Plugin bootstrap
  * Initializes lifecycle hooks for automatic translation
- * Uses Strapi v5 lifecycle patterns with event-based decoupling
+ * Uses queue-based approach to avoid SQLite transaction conflicts
  */
 
 module.exports = async ({ strapi }) => {
   strapi.log.info('[Strapi Localize] Plugin initializing...');
 
+  // Translation queue - processed by interval
+  const translationQueue = [];
+  const processingSet = new Set();
+  const QUEUE_PROCESS_INTERVAL = 5000; // Process queue every 5 seconds
+
   // Track recent translations to prevent duplicates
   const recentTranslations = new Map();
-  const DEBOUNCE_MS = 5000;
-  const TRANSLATION_EVENT = 'strapi-localize.translate';
+  const DEBOUNCE_MS = 10000;
 
   /**
-   * Handle translation event - runs completely outside lifecycle context
+   * Process translation queue - runs on interval, completely outside any request context
    */
-  strapi.eventHub.on(TRANSLATION_EVENT, async (data) => {
-    const { uid, documentId, locale } = data;
-    const translationKey = `${uid}:${documentId}:${locale}`;
+  const processQueue = async () => {
+    if (translationQueue.length === 0) {
+      return;
+    }
 
-    strapi.log.debug(`[Strapi Localize] Received translation event: ${translationKey}`);
+    // Get next item
+    const item = translationQueue.shift();
+    if (!item) return;
+
+    const { uid, documentId, locale, queuedAt } = item;
+    const translationKey = `${uid}:${documentId}`;
+
+    // Skip if already processing
+    if (processingSet.has(translationKey)) {
+      strapi.log.debug(`[Strapi Localize] Already processing: ${translationKey}`);
+      return;
+    }
+
+    processingSet.add(translationKey);
 
     try {
+      strapi.log.info(`[Strapi Localize] Processing queued translation: ${translationKey}`);
+
       const translationService = strapi.plugin('strapi-localize').service('translation');
       const settingsService = strapi.plugin('strapi-localize').service('settings');
       const i18nService = strapi.plugin('strapi-localize').service('i18n');
 
-      // Get fresh settings
+      // Get settings
       const settings = await settingsService.getSettings();
       if (!settings.autoTranslate) {
         strapi.log.debug(`[Strapi Localize] Auto-translate disabled globally`);
@@ -72,9 +92,15 @@ module.exports = async ({ strapi }) => {
 
       strapi.log.info(`[Strapi Localize] Auto-translate completed: successful=${successCount}, failed=${failCount}`);
     } catch (error) {
-      strapi.log.error(`[Strapi Localize] Translation event error: ${error.message}`);
+      strapi.log.error(`[Strapi Localize] Queue processing error: ${error.message}`);
+    } finally {
+      processingSet.delete(translationKey);
     }
-  });
+  };
+
+  // Start queue processor
+  setInterval(processQueue, QUEUE_PROCESS_INTERVAL);
+  strapi.log.info(`[Strapi Localize] Translation queue processor started (interval: ${QUEUE_PROCESS_INTERVAL}ms)`);
 
   // Find all localizable content types (both collection and single types)
   const localizableModels = Object.keys(strapi.contentTypes).filter(key => {
@@ -139,17 +165,15 @@ module.exports = async ({ strapi }) => {
       }
     }
 
-    strapi.log.debug(`[Strapi Localize] Scheduling translation from ${hookType}: ${translationKey}`);
+    strapi.log.debug(`[Strapi Localize] Queuing translation from ${hookType}: ${translationKey}`);
 
-    // Emit event after a delay to ensure the transaction is fully committed
-    // The event handler runs in a completely separate context
-    setTimeout(() => {
-      strapi.eventHub.emit(TRANSLATION_EVENT, {
-        uid: cleanEvent.model.uid,
-        documentId: cleanEvent.result.documentId,
-        locale: cleanEvent.result.locale,
-      });
-    }, 3000);
+    // Add to queue - will be processed by the interval-based processor
+    translationQueue.push({
+      uid: cleanEvent.model.uid,
+      documentId: cleanEvent.result.documentId,
+      locale: cleanEvent.result.locale,
+      queuedAt: Date.now(),
+    });
   };
 
   // Subscribe to lifecycle events for localizable models

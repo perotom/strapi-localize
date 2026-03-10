@@ -5,14 +5,26 @@ function getDefaultExportFromCjs(x) {
 }
 var bootstrap = async ({ strapi }) => {
   strapi.log.info("[Strapi Localize] Plugin initializing...");
+  const translationQueue = [];
+  const processingSet = /* @__PURE__ */ new Set();
+  const QUEUE_PROCESS_INTERVAL = 5e3;
   const recentTranslations = /* @__PURE__ */ new Map();
-  const DEBOUNCE_MS = 5e3;
-  const TRANSLATION_EVENT = "strapi-localize.translate";
-  strapi.eventHub.on(TRANSLATION_EVENT, async (data) => {
-    const { uid, documentId, locale } = data;
-    const translationKey = `${uid}:${documentId}:${locale}`;
-    strapi.log.debug(`[Strapi Localize] Received translation event: ${translationKey}`);
+  const DEBOUNCE_MS = 1e4;
+  const processQueue = async () => {
+    if (translationQueue.length === 0) {
+      return;
+    }
+    const item = translationQueue.shift();
+    if (!item) return;
+    const { uid, documentId, locale, queuedAt } = item;
+    const translationKey = `${uid}:${documentId}`;
+    if (processingSet.has(translationKey)) {
+      strapi.log.debug(`[Strapi Localize] Already processing: ${translationKey}`);
+      return;
+    }
+    processingSet.add(translationKey);
     try {
+      strapi.log.info(`[Strapi Localize] Processing queued translation: ${translationKey}`);
       const translationService = strapi.plugin("strapi-localize").service("translation");
       const settingsService = strapi.plugin("strapi-localize").service("settings");
       const i18nService = strapi.plugin("strapi-localize").service("i18n");
@@ -51,9 +63,13 @@ var bootstrap = async ({ strapi }) => {
       }
       strapi.log.info(`[Strapi Localize] Auto-translate completed: successful=${successCount}, failed=${failCount}`);
     } catch (error) {
-      strapi.log.error(`[Strapi Localize] Translation event error: ${error.message}`);
+      strapi.log.error(`[Strapi Localize] Queue processing error: ${error.message}`);
+    } finally {
+      processingSet.delete(translationKey);
     }
-  });
+  };
+  setInterval(processQueue, QUEUE_PROCESS_INTERVAL);
+  strapi.log.info(`[Strapi Localize] Translation queue processor started (interval: ${QUEUE_PROCESS_INTERVAL}ms)`);
   const localizableModels = Object.keys(strapi.contentTypes).filter((key) => {
     const contentType = strapi.contentTypes[key];
     return (
@@ -94,14 +110,13 @@ var bootstrap = async ({ strapi }) => {
         }
       }
     }
-    strapi.log.debug(`[Strapi Localize] Scheduling translation from ${hookType}: ${translationKey}`);
-    setTimeout(() => {
-      strapi.eventHub.emit(TRANSLATION_EVENT, {
-        uid: cleanEvent.model.uid,
-        documentId: cleanEvent.result.documentId,
-        locale: cleanEvent.result.locale
-      });
-    }, 3e3);
+    strapi.log.debug(`[Strapi Localize] Queuing translation from ${hookType}: ${translationKey}`);
+    translationQueue.push({
+      uid: cleanEvent.model.uid,
+      documentId: cleanEvent.result.documentId,
+      locale: cleanEvent.result.locale,
+      queuedAt: Date.now()
+    });
   };
   strapi.db.lifecycles.subscribe({
     models: localizableModels,
