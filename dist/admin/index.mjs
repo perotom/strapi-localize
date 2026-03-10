@@ -38,7 +38,7 @@ const index = {
           },
           id: "settings",
           to: PLUGIN_ID,
-          Component: () => import("../_chunks/index-BZcaNPi9.mjs").then((mod) => ({
+          Component: () => import("../_chunks/index-DnohDgAa.mjs").then((mod) => ({
             default: mod.default
           }))
         }

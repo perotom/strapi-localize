@@ -5,14 +5,16 @@ import {
   TextInput,
   Button,
   Flex,
-  Card,
-  CardHeader,
-  CardBody,
-  CardContent,
   Field,
   Checkbox,
   Divider,
+  Grid,
+  Main,
+  HeaderLayout,
+  ContentLayout,
+  Badge,
 } from '@strapi/design-system';
+import { Check, Cross } from '@strapi/icons';
 import { useFetchClient, useNotification } from '@strapi/strapi/admin';
 
 const Settings = () => {
@@ -119,130 +121,152 @@ const Settings = () => {
 
   if (isLoading) {
     return (
-      <Box padding={8}>
-        <Typography>Loading settings...</Typography>
-      </Box>
+      <Main>
+        <ContentLayout>
+          <Box padding={8}>
+            <Typography>Loading settings...</Typography>
+          </Box>
+        </ContentLayout>
+      </Main>
     );
   }
 
   return (
-    <Box padding={8}>
-      <Typography variant="alpha" marginBottom={4}>
-        DeepL Translate Settings
-      </Typography>
+    <Main>
+      <HeaderLayout
+        title="Strapi Localize"
+        subtitle="Automatic content translation using DeepL"
+        primaryAction={
+          <Button onClick={handleSave} loading={isSaving}>
+            Save
+          </Button>
+        }
+      />
+      <ContentLayout>
+        <Flex direction="column" gap={6}>
+          {/* API Configuration */}
+          <Box background="neutral0" padding={6} shadow="filterShadow" hasRadius>
+            <Flex direction="column" gap={4}>
+              <Typography variant="delta" fontWeight="bold">
+                DeepL API Configuration
+              </Typography>
 
-      <Flex direction="column" gap={6}>
-        {/* API Configuration */}
-        <Card>
-          <CardHeader>
-            <Typography variant="beta">API Configuration</Typography>
-          </CardHeader>
-          <CardBody>
-            <CardContent>
-              <Flex direction="column" gap={4}>
-                <Field.Root>
-                  <Field.Label>DeepL API Key</Field.Label>
-                  <TextInput
-                    type="password"
-                    name="apiKey"
-                    value={settings.apiKey || ''}
-                    onChange={(e) =>
-                      setSettings({ ...settings, apiKey: e.target.value })
-                    }
-                  />
-                  <Field.Hint>Enter your DeepL API key (Free or Pro)</Field.Hint>
-                </Field.Root>
+              <Grid.Root gap={4}>
+                <Grid.Item col={6} s={12}>
+                  <Field.Root width="100%">
+                    <Field.Label>API Key</Field.Label>
+                    <TextInput
+                      type="password"
+                      name="apiKey"
+                      placeholder="Enter your DeepL API key"
+                      value={settings.apiKey || ''}
+                      onChange={(e) =>
+                        setSettings({ ...settings, apiKey: e.target.value })
+                      }
+                    />
+                    <Field.Hint>Get your API key from deepl.com</Field.Hint>
+                  </Field.Root>
+                </Grid.Item>
+                <Grid.Item col={6} s={12}>
+                  <Field.Root>
+                    <Field.Label>Connection Status</Field.Label>
+                    <Flex gap={3} alignItems="center" paddingTop={2}>
+                      <Button
+                        onClick={handleTestConnection}
+                        loading={isTestingConnection}
+                        disabled={!settings.apiKey}
+                        variant="secondary"
+                        size="S"
+                      >
+                        Test Connection
+                      </Button>
+                      {connectionStatus !== null && (
+                        <Badge active={connectionStatus} backgroundColor={connectionStatus ? 'success100' : 'danger100'} textColor={connectionStatus ? 'success700' : 'danger700'}>
+                          {connectionStatus ? 'Connected' : 'Failed'}
+                        </Badge>
+                      )}
+                    </Flex>
+                  </Field.Root>
+                </Grid.Item>
+              </Grid.Root>
 
-                <Flex gap={2} alignItems="center">
-                  <Button
-                    onClick={handleTestConnection}
-                    loading={isTestingConnection}
-                    disabled={!settings.apiKey}
-                    variant="secondary"
-                  >
-                    Test Connection
-                  </Button>
-                  {connectionStatus !== null && (
-                    <Typography textColor={connectionStatus ? 'success600' : 'danger600'}>
-                      {connectionStatus ? '✓ Connected' : '✗ Connection failed'}
-                    </Typography>
-                  )}
-                </Flex>
+              <Divider />
 
-                <Divider />
+              <Checkbox
+                checked={settings.autoTranslate || false}
+                onCheckedChange={(checked) =>
+                  setSettings({ ...settings, autoTranslate: checked })
+                }
+              >
+                <Typography fontWeight="semiBold">Enable auto-translation globally</Typography>
+              </Checkbox>
+              <Typography variant="pi" textColor="neutral600">
+                When enabled, content will be automatically translated to all locales when saved.
+              </Typography>
+            </Flex>
+          </Box>
 
-                <Checkbox
-                  checked={settings.autoTranslate || false}
-                  onCheckedChange={(checked) =>
-                    setSettings({ ...settings, autoTranslate: checked })
-                  }
-                >
-                  Enable global auto-translation (translate content automatically when saved)
-                </Checkbox>
-              </Flex>
-            </CardContent>
-          </CardBody>
-        </Card>
+          {/* Content Type Configuration */}
+          <Box background="neutral0" padding={6} shadow="filterShadow" hasRadius>
+            <Flex direction="column" gap={4}>
+              <Typography variant="delta" fontWeight="bold">
+                Content Types
+              </Typography>
+              <Typography variant="pi" textColor="neutral600">
+                Select which content types should be translated. Only content types with i18n enabled are shown.
+              </Typography>
 
-        {/* Content Type Configuration */}
-        <Card>
-          <CardHeader>
-            <Typography variant="beta">Content Type Configuration</Typography>
-          </CardHeader>
-          <CardBody>
-            <CardContent>
               {contentTypes.length === 0 ? (
-                <Typography textColor="neutral600">
-                  No localizable content types found. Please ensure you have content types with i18n enabled.
-                </Typography>
+                <Box padding={4} background="neutral100" hasRadius>
+                  <Typography textColor="neutral600">
+                    No localizable content types found. Enable i18n on your content types first.
+                  </Typography>
+                </Box>
               ) : (
-                <Flex direction="column" gap={4}>
-                  {contentTypes.map((contentType) => {
+                <Box>
+                  {contentTypes.map((contentType, index) => {
                     const ctSettings = settings.contentTypes?.[contentType.uid] || {};
                     return (
-                      <Box key={contentType.uid} padding={4} background="neutral100" hasRadius>
-                        <Flex direction="column" gap={3}>
-                          <Typography variant="delta" fontWeight="bold">
-                            {contentType.displayName}
-                          </Typography>
-                          <Typography variant="pi" textColor="neutral600">
-                            {contentType.uid}
-                          </Typography>
-
-                          <Flex gap={4}>
-                            <Checkbox
-                              checked={ctSettings.enabled || false}
-                              onCheckedChange={() => handleContentTypeToggle(contentType.uid)}
-                            >
-                              Enable translation
-                            </Checkbox>
-
-                            {ctSettings.enabled && (
+                      <Box key={contentType.uid}>
+                        {index > 0 && <Divider />}
+                        <Box paddingTop={4} paddingBottom={4}>
+                          <Flex justifyContent="space-between" alignItems="flex-start">
+                            <Box>
+                              <Typography variant="omega" fontWeight="bold">
+                                {contentType.displayName}
+                              </Typography>
+                              <Typography variant="pi" textColor="neutral500">
+                                {contentType.uid}
+                              </Typography>
+                            </Box>
+                            <Flex gap={4}>
                               <Checkbox
-                                checked={ctSettings.autoTranslate || false}
-                                onCheckedChange={() => handleAutoTranslateToggle(contentType.uid)}
+                                checked={ctSettings.enabled || false}
+                                onCheckedChange={() => handleContentTypeToggle(contentType.uid)}
                               >
-                                Auto-translate on save
+                                Enable
                               </Checkbox>
-                            )}
+                              {ctSettings.enabled && (
+                                <Checkbox
+                                  checked={ctSettings.autoTranslate || false}
+                                  onCheckedChange={() => handleAutoTranslateToggle(contentType.uid)}
+                                >
+                                  Auto-translate
+                                </Checkbox>
+                              )}
+                            </Flex>
                           </Flex>
-                        </Flex>
+                        </Box>
                       </Box>
                     );
                   })}
-                </Flex>
+                </Box>
               )}
-            </CardContent>
-          </CardBody>
-        </Card>
-
-        <Box>
-          <Button onClick={handleSave} loading={isSaving}>
-            Save Settings
-          </Button>
-        </Box>
-      </Flex>
-    </Box>
+            </Flex>
+          </Box>
+        </Flex>
+      </ContentLayout>
+    </Main>
   );
 };
 
