@@ -115,6 +115,8 @@ function requireLifecycle() {
 var bootstrap = async ({ strapi }) => {
   strapi.log.info("[Strapi Localize] Plugin initializing...");
   const lifecycleMiddleware = requireLifecycle()({ strapi });
+  const recentTranslations = /* @__PURE__ */ new Map();
+  const DEBOUNCE_MS = 3e3;
   const localizableModels = Object.keys(strapi.contentTypes).filter((key) => {
     const contentType = strapi.contentTypes[key];
     return (
@@ -128,29 +130,55 @@ var bootstrap = async ({ strapi }) => {
   if (localizableModels.length > 0) {
     strapi.log.debug(`[Strapi Localize] Localizable models: ${localizableModels.join(", ")}`);
   }
+  const scheduleTranslation = (event, hookType) => {
+    const { model, result } = event;
+    if (!result || !result.documentId) {
+      return;
+    }
+    const cleanEvent = {
+      model: { uid: model.uid },
+      result: {
+        documentId: result.documentId,
+        locale: result.locale
+      }
+    };
+    const translationKey = `${model.uid}:${result.documentId}:${result.locale}`;
+    const lastTranslation = recentTranslations.get(translationKey);
+    if (lastTranslation && Date.now() - lastTranslation < DEBOUNCE_MS) {
+      strapi.log.debug(`[Strapi Localize] Debouncing ${hookType} for ${translationKey}`);
+      return;
+    }
+    recentTranslations.set(translationKey, Date.now());
+    if (recentTranslations.size > 100) {
+      const now = Date.now();
+      for (const [key, time] of recentTranslations.entries()) {
+        if (now - time > DEBOUNCE_MS * 2) {
+          recentTranslations.delete(key);
+        }
+      }
+    }
+    strapi.log.debug(`[Strapi Localize] Scheduling translation from ${hookType}: ${translationKey}`);
+    setImmediate(() => {
+      setTimeout(() => {
+        lifecycleMiddleware.translateOnUpdate(cleanEvent).catch((error) => {
+          strapi.log.error(`[Strapi Localize] Error in ${hookType} hook: ${error.message}`);
+        });
+      }, 2e3);
+    });
+  };
   strapi.db.lifecycles.subscribe({
     models: localizableModels,
     /**
      * After content is created
-     * Delay translation to allow Strapi to finish processing
      */
     async afterCreate(event) {
-      setTimeout(() => {
-        lifecycleMiddleware.translateOnUpdate(event).catch((error) => {
-          strapi.log.error(`[Strapi Localize] Error in afterCreate hook: ${error.message}`);
-        });
-      }, 1e3);
+      scheduleTranslation(event, "afterCreate");
     },
     /**
      * After content is updated
-     * Delay translation to allow Strapi to finish processing
      */
     async afterUpdate(event) {
-      setTimeout(() => {
-        lifecycleMiddleware.translateOnUpdate(event).catch((error) => {
-          strapi.log.error(`[Strapi Localize] Error in afterUpdate hook: ${error.message}`);
-        });
-      }, 1e3);
+      scheduleTranslation(event, "afterUpdate");
     }
   });
   strapi.log.info("[Strapi Localize] Plugin initialized successfully");

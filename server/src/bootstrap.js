@@ -11,6 +11,10 @@ module.exports = async ({ strapi }) => {
 
   const lifecycleMiddleware = require('./middlewares/lifecycle')({ strapi });
 
+  // Track recent translations to prevent duplicates from afterCreate + afterUpdate firing together
+  const recentTranslations = new Map();
+  const DEBOUNCE_MS = 3000;
+
   // Find all localizable content types (both collection and single types)
   const localizableModels = Object.keys(strapi.contentTypes).filter(key => {
     const contentType = strapi.contentTypes[key];
@@ -32,6 +36,61 @@ module.exports = async ({ strapi }) => {
     strapi.log.debug(`[Strapi Localize] Localizable models: ${localizableModels.join(', ')}`);
   }
 
+  /**
+   * Schedule translation outside of the database transaction context
+   * Creates a clean event object without transaction references
+   */
+  const scheduleTranslation = (event, hookType) => {
+    const { model, result } = event;
+
+    if (!result || !result.documentId) {
+      return;
+    }
+
+    // Create a clean event copy without transaction references
+    const cleanEvent = {
+      model: { uid: model.uid },
+      result: {
+        documentId: result.documentId,
+        locale: result.locale,
+      },
+    };
+
+    const translationKey = `${model.uid}:${result.documentId}:${result.locale}`;
+
+    // Check if we recently scheduled a translation for this entry (debounce)
+    const lastTranslation = recentTranslations.get(translationKey);
+    if (lastTranslation && Date.now() - lastTranslation < DEBOUNCE_MS) {
+      strapi.log.debug(`[Strapi Localize] Debouncing ${hookType} for ${translationKey}`);
+      return;
+    }
+
+    // Mark as recently scheduled
+    recentTranslations.set(translationKey, Date.now());
+
+    // Clean up old entries periodically
+    if (recentTranslations.size > 100) {
+      const now = Date.now();
+      for (const [key, time] of recentTranslations.entries()) {
+        if (now - time > DEBOUNCE_MS * 2) {
+          recentTranslations.delete(key);
+        }
+      }
+    }
+
+    strapi.log.debug(`[Strapi Localize] Scheduling translation from ${hookType}: ${translationKey}`);
+
+    // Use setImmediate to fully exit the current execution context
+    // Then setTimeout to ensure database transaction is fully committed
+    setImmediate(() => {
+      setTimeout(() => {
+        lifecycleMiddleware.translateOnUpdate(cleanEvent).catch(error => {
+          strapi.log.error(`[Strapi Localize] Error in ${hookType} hook: ${error.message}`);
+        });
+      }, 2000);
+    });
+  };
+
   // Subscribe to lifecycle events for localizable models
   // In Strapi v5, we use afterCreate and afterUpdate with result containing documentId
   strapi.db.lifecycles.subscribe({
@@ -39,27 +98,16 @@ module.exports = async ({ strapi }) => {
 
     /**
      * After content is created
-     * Delay translation to allow Strapi to finish processing
      */
     async afterCreate(event) {
-      // Use setTimeout to allow Strapi to complete its operations
-      setTimeout(() => {
-        lifecycleMiddleware.translateOnUpdate(event).catch(error => {
-          strapi.log.error(`[Strapi Localize] Error in afterCreate hook: ${error.message}`);
-        });
-      }, 1000);
+      scheduleTranslation(event, 'afterCreate');
     },
 
     /**
      * After content is updated
-     * Delay translation to allow Strapi to finish processing
      */
     async afterUpdate(event) {
-      setTimeout(() => {
-        lifecycleMiddleware.translateOnUpdate(event).catch(error => {
-          strapi.log.error(`[Strapi Localize] Error in afterUpdate hook: ${error.message}`);
-        });
-      }, 1000);
+      scheduleTranslation(event, 'afterUpdate');
     },
   });
 
