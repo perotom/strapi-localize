@@ -24,10 +24,7 @@ export default {
           },
           id: 'settings',
           to: `/settings/${PLUGIN_ID}`,
-          Component: async () => {
-            const component = await import('./pages/Settings');
-            return component;
-          },
+          Component: () => import('./pages/Settings'),
         },
       ]
     );

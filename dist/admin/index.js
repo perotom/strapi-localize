@@ -39,10 +39,7 @@ const index = {
           },
           id: "settings",
           to: `/settings/${PLUGIN_ID}`,
-          Component: async () => {
-            const component = await Promise.resolve().then(() => require("../_chunks/index-DKcLv0JU.js"));
-            return component;
-          }
+          Component: () => Promise.resolve().then(() => require("../_chunks/index-DKcLv0JU.js"))
         }
       ]
     );
