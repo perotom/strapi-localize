@@ -16,12 +16,25 @@ describe('Translate Controller', () => {
         }
       },
       plugin: jest.fn(() => ({
-        service: jest.fn(() => ({
-          translateContent: jest.fn().mockResolvedValue({ id: 1, locale: 'de' }),
-        })),
+        service: jest.fn((serviceName) => {
+          if (serviceName === 'translation') {
+            return {
+              translateContent: jest.fn().mockResolvedValue({ documentId: 'doc-123', locale: 'de' }),
+            };
+          }
+          if (serviceName === 'deepl') {
+            return {
+              getAvailableLanguages: jest.fn().mockResolvedValue([{ language: 'DE' }]),
+            };
+          }
+          return {};
+        }),
       })),
       log: {
         error: jest.fn(),
+        warn: jest.fn(),
+        info: jest.fn(),
+        debug: jest.fn(),
       },
     };
 
@@ -83,17 +96,19 @@ describe('Translate Controller', () => {
     });
   });
 
-  describe('validateId', () => {
-    it('should accept valid IDs', () => {
-      expect(controller.validateId(1).valid).toBe(true);
-      expect(controller.validateId('42').valid).toBe(true);
+  describe('validateDocumentId', () => {
+    it('should accept valid documentIds', () => {
+      expect(controller.validateDocumentId('abc123').valid).toBe(true);
+      expect(controller.validateDocumentId('doc-uuid-here').valid).toBe(true);
+      expect(controller.validateDocumentId('12345').valid).toBe(true);
     });
 
-    it('should reject invalid IDs', () => {
-      expect(controller.validateId(0).valid).toBe(false);
-      expect(controller.validateId(-1).valid).toBe(false);
-      expect(controller.validateId('abc').valid).toBe(false);
-      expect(controller.validateId(null).valid).toBe(false);
+    it('should reject invalid documentIds', () => {
+      expect(controller.validateDocumentId('').valid).toBe(false);
+      expect(controller.validateDocumentId('   ').valid).toBe(false);
+      expect(controller.validateDocumentId(null).valid).toBe(false);
+      expect(controller.validateDocumentId(undefined).valid).toBe(false);
+      expect(controller.validateDocumentId(123).valid).toBe(false); // Must be string
     });
   });
 
@@ -111,7 +126,7 @@ describe('Translate Controller', () => {
 
     it('should translate successfully with valid input', async () => {
       ctx.request.body = {
-        id: 1,
+        documentId: 'doc-123',
         model: 'api::article.article',
         targetLocale: 'de',
         sourceLocale: 'en'
@@ -119,12 +134,12 @@ describe('Translate Controller', () => {
 
       await controller.translate(ctx);
 
-      expect(ctx.body).toEqual({ id: 1, locale: 'de' });
+      expect(ctx.body).toEqual({ documentId: 'doc-123', locale: 'de' });
       expect(ctx.badRequest).not.toHaveBeenCalled();
     });
 
     it('should reject missing parameters', async () => {
-      ctx.request.body = { id: 1, model: 'api::article.article' };
+      ctx.request.body = { documentId: 'doc-123', model: 'api::article.article' };
 
       await controller.translate(ctx);
 
@@ -133,9 +148,9 @@ describe('Translate Controller', () => {
       );
     });
 
-    it('should reject invalid ID', async () => {
+    it('should reject invalid documentId (whitespace)', async () => {
       ctx.request.body = {
-        id: -1,
+        documentId: '   ',
         model: 'api::article.article',
         targetLocale: 'de'
       };
@@ -143,7 +158,21 @@ describe('Translate Controller', () => {
       await controller.translate(ctx);
 
       expect(ctx.badRequest).toHaveBeenCalledWith(
-        expect.stringContaining('positive number')
+        expect.stringContaining('cannot be empty')
+      );
+    });
+
+    it('should reject non-string documentId', async () => {
+      ctx.request.body = {
+        documentId: 123,
+        model: 'api::article.article',
+        targetLocale: 'de'
+      };
+
+      await controller.translate(ctx);
+
+      expect(ctx.badRequest).toHaveBeenCalledWith(
+        expect.stringContaining('must be a string')
       );
     });
   });
@@ -160,33 +189,33 @@ describe('Translate Controller', () => {
       };
     });
 
-    it('should reject non-array ids', async () => {
+    it('should reject non-array documentIds', async () => {
       ctx.request.body = {
-        ids: 'not-an-array',
+        documentIds: 'not-an-array',
         model: 'api::article.article',
         targetLocale: 'de'
       };
 
       await controller.translateBatch(ctx);
 
-      expect(ctx.badRequest).toHaveBeenCalledWith('ids must be an array');
+      expect(ctx.badRequest).toHaveBeenCalledWith('documentIds must be an array');
     });
 
     it('should reject empty array', async () => {
       ctx.request.body = {
-        ids: [],
+        documentIds: [],
         model: 'api::article.article',
         targetLocale: 'de'
       };
 
       await controller.translateBatch(ctx);
 
-      expect(ctx.badRequest).toHaveBeenCalledWith('ids array cannot be empty');
+      expect(ctx.badRequest).toHaveBeenCalledWith('documentIds array cannot be empty');
     });
 
     it('should reject batch size over 50', async () => {
       ctx.request.body = {
-        ids: Array(51).fill(1),
+        documentIds: Array(51).fill('doc-1'),
         model: 'api::article.article',
         targetLocale: 'de'
       };
@@ -198,7 +227,7 @@ describe('Translate Controller', () => {
 
     it('should process valid batch', async () => {
       ctx.request.body = {
-        ids: [1, 2, 3],
+        documentIds: ['doc-1', 'doc-2', 'doc-3'],
         model: 'api::article.article',
         targetLocale: 'de',
         sourceLocale: 'en'
@@ -209,6 +238,37 @@ describe('Translate Controller', () => {
       expect(ctx.body).toHaveProperty('results');
       expect(ctx.body).toHaveProperty('summary');
       expect(ctx.body.summary.total).toBe(3);
+    });
+
+    it('should reject invalid documentId in batch', async () => {
+      ctx.request.body = {
+        documentIds: ['doc-1', '', 'doc-3'],
+        model: 'api::article.article',
+        targetLocale: 'de'
+      };
+
+      await controller.translateBatch(ctx);
+
+      expect(ctx.badRequest).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid documentId ''")
+      );
+    });
+  });
+
+  describe('getLanguages', () => {
+    let ctx;
+
+    beforeEach(() => {
+      ctx = {
+        throw: jest.fn(),
+        body: null,
+      };
+    });
+
+    it('should return available languages', async () => {
+      await controller.getLanguages(ctx);
+
+      expect(ctx.body).toEqual([{ language: 'DE' }]);
     });
   });
 });

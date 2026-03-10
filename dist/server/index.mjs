@@ -11,74 +11,99 @@ function requireLifecycle() {
   lifecycle$1 = ({ strapi }) => {
     const translatingEntries = /* @__PURE__ */ new Set();
     const translateOnUpdate = async (event) => {
-      const { model, data, where } = event.params;
-      strapi.log.debug(`[Strapi Localize] Lifecycle hook triggered: model=${model.uid}, id=${where.id}`);
-      const entryKey = `${model.uid}:${where.id}`;
+      const { model, result } = event;
+      if (!result || !result.documentId) {
+        strapi.log.debug(`[Strapi Localize] Lifecycle hook: no result or documentId`);
+        return;
+      }
+      const documentId = result.documentId;
+      const currentLocale = result.locale;
+      strapi.log.debug(`[Strapi Localize] Lifecycle hook triggered: model=${model.uid}, documentId=${documentId}, locale=${currentLocale}`);
+      const entryKey = `${model.uid}:${documentId}:${currentLocale}`;
       if (translatingEntries.has(entryKey)) {
         strapi.log.debug(`[Strapi Localize] Skipping - entry is being translated: ${entryKey}`);
         return;
       }
       const settings2 = await strapi.plugin("strapi-localize").service("settings").getSettings();
       if (!settings2.autoTranslate) {
-        strapi.log.debug(`[Strapi Localize] Auto-translate disabled globally: model=${model.uid}, id=${where.id}`);
+        strapi.log.debug(`[Strapi Localize] Auto-translate disabled globally: model=${model.uid}, documentId=${documentId}`);
         return;
       }
       const contentTypeSettings = settings2.contentTypes?.[model.uid];
       if (!contentTypeSettings?.enabled || !contentTypeSettings?.autoTranslate) {
-        strapi.log.debug(`[Strapi Localize] Auto-translate not enabled for content type: model=${model.uid}, id=${where.id}`);
+        strapi.log.debug(`[Strapi Localize] Auto-translate not enabled for content type: model=${model.uid}`);
         return;
       }
       const modelSchema = strapi.getModel(model.uid);
       if (!modelSchema.pluginOptions?.i18n?.localized) {
-        strapi.log.debug(`[Strapi Localize] Content type not localized: model=${model.uid}, id=${where.id}`);
+        strapi.log.debug(`[Strapi Localize] Content type not localized: model=${model.uid}`);
         return;
       }
-      const entity = await strapi.entityService.findOne(model.uid, where.id, {
-        populate: ["localizations"]
-      });
-      if (!entity) {
-        strapi.log.debug(`[Strapi Localize] Entity not found: model=${model.uid}, id=${where.id}`);
+      const i18nService = strapi.plugin("strapi-localize").service("i18n");
+      const allLocales = await i18nService.getLocales();
+      const targetLocales = allLocales.filter((l) => l.code !== currentLocale);
+      if (targetLocales.length === 0) {
+        strapi.log.debug(`[Strapi Localize] No target locales available: model=${model.uid}, documentId=${documentId}`);
         return;
       }
-      if (entity.localizations && entity.localizations.length > 0) {
-        strapi.log.debug(`[Strapi Localize] Skipping - entry already has localizations (might be a translation): model=${model.uid}, id=${where.id}`);
-        return;
+      const existingLocalizations = [];
+      for (const locale of allLocales) {
+        if (locale.code === currentLocale) continue;
+        const existing = await i18nService.getExistingLocalization(model.uid, documentId, locale.code);
+        if (existing) {
+          existingLocalizations.push(locale.code);
+        }
       }
-      const currentLocale = entity.locale || "en";
-      const targetLocales = await strapi.plugins.i18n.services.locales.find();
-      const targetLocaleCodes = targetLocales.filter((l) => l.code !== currentLocale).map((l) => l.code);
-      if (targetLocaleCodes.length === 0) {
-        strapi.log.debug(`[Strapi Localize] Only one locale exists, skipping translation: model=${model.uid}, id=${where.id}`);
-        return;
-      }
-      strapi.log.info(`[Strapi Localize] Auto-translate triggered: model=${model.uid}, id=${where.id}, source=${currentLocale}, targets=[${targetLocaleCodes.join(", ")}]`);
+      const localesNeedingTranslation = targetLocales.filter(
+        (l) => !existingLocalizations.includes(l.code)
+      );
+      const localesToTranslate = localesNeedingTranslation.length > 0 ? localesNeedingTranslation : targetLocales;
+      strapi.log.info(`[Strapi Localize] Auto-translate triggered: model=${model.uid}, documentId=${documentId}, source=${currentLocale}, targets=[${localesToTranslate.map((l) => l.code).join(", ")}]`);
       let successCount = 0;
       let failCount = 0;
-      for (const targetLocale of targetLocales) {
-        if (targetLocale.code === currentLocale) {
-          continue;
-        }
-        const targetEntryKey = `${model.uid}:${where.id}:${targetLocale.code}`;
+      const translationService = strapi.plugin("strapi-localize").service("translation");
+      for (const targetLocale of localesToTranslate) {
+        const targetEntryKey = `${model.uid}:${documentId}:${targetLocale.code}`;
         translatingEntries.add(targetEntryKey);
         try {
-          await strapi.plugin("strapi-localize").service("deepl").translateContent(where.id, model.uid, targetLocale.code, currentLocale);
+          await translationService.translateContent(
+            documentId,
+            model.uid,
+            targetLocale.code,
+            currentLocale
+          );
           strapi.log.info(
-            `[Strapi Localize] Auto-translation successful: model=${model.uid}, id=${where.id}, source=${currentLocale}, target=${targetLocale.code}`
+            `[Strapi Localize] Auto-translation successful: model=${model.uid}, documentId=${documentId}, source=${currentLocale}, target=${targetLocale.code}`
           );
           successCount++;
         } catch (error) {
           strapi.log.error(
-            `[Strapi Localize] Auto-translation failed: model=${model.uid}, id=${where.id}, target=${targetLocale.code}, error=${error.message}`
+            `[Strapi Localize] Auto-translation failed: model=${model.uid}, documentId=${documentId}, target=${targetLocale.code}, error=${error.message}`
           );
           failCount++;
         } finally {
           translatingEntries.delete(targetEntryKey);
         }
       }
-      strapi.log.info(`[Strapi Localize] Auto-translate completed: model=${model.uid}, id=${where.id}, successful=${successCount}, failed=${failCount}`);
+      strapi.log.info(`[Strapi Localize] Auto-translate completed: model=${model.uid}, documentId=${documentId}, successful=${successCount}, failed=${failCount}`);
+    };
+    const markAsTranslating = (uid, documentId, locale) => {
+      const key = `${uid}:${documentId}:${locale}`;
+      translatingEntries.add(key);
+      return key;
+    };
+    const unmarkAsTranslating = (key) => {
+      translatingEntries.delete(key);
+    };
+    const isTranslating = (uid, documentId, locale) => {
+      const key = `${uid}:${documentId}:${locale}`;
+      return translatingEntries.has(key);
     };
     return {
-      translateOnUpdate
+      translateOnUpdate,
+      markAsTranslating,
+      unmarkAsTranslating,
+      isTranslating
     };
   };
   return lifecycle$1;
@@ -88,7 +113,12 @@ var bootstrap = async ({ strapi }) => {
   const lifecycleMiddleware = requireLifecycle()({ strapi });
   const localizableModels = Object.keys(strapi.contentTypes).filter((key) => {
     const contentType = strapi.contentTypes[key];
-    return contentType.kind === "collectionType" && !key.startsWith("plugin::") && !key.startsWith("strapi::") && contentType.pluginOptions?.i18n?.localized === true;
+    return (
+      // Include both collection types and single types
+      (contentType.kind === "collectionType" || contentType.kind === "singleType") && // Exclude system/plugin content types
+      !key.startsWith("plugin::") && !key.startsWith("strapi::") && !key.startsWith("admin::") && // Must have i18n enabled
+      contentType.pluginOptions?.i18n?.localized === true
+    );
   });
   strapi.log.info(`[Strapi Localize] Found ${localizableModels.length} localizable content types`);
   if (localizableModels.length > 0) {
@@ -96,11 +126,27 @@ var bootstrap = async ({ strapi }) => {
   }
   strapi.db.lifecycles.subscribe({
     models: localizableModels,
+    /**
+     * After content is created
+     * Delay translation to allow Strapi to finish processing
+     */
     async afterCreate(event) {
-      setTimeout(() => lifecycleMiddleware.translateOnUpdate(event), 1e3);
+      setTimeout(() => {
+        lifecycleMiddleware.translateOnUpdate(event).catch((error) => {
+          strapi.log.error(`[Strapi Localize] Error in afterCreate hook: ${error.message}`);
+        });
+      }, 1e3);
     },
+    /**
+     * After content is updated
+     * Delay translation to allow Strapi to finish processing
+     */
     async afterUpdate(event) {
-      setTimeout(() => lifecycleMiddleware.translateOnUpdate(event), 1e3);
+      setTimeout(() => {
+        lifecycleMiddleware.translateOnUpdate(event).catch((error) => {
+          strapi.log.error(`[Strapi Localize] Error in afterUpdate hook: ${error.message}`);
+        });
+      }, 1e3);
     }
   });
   strapi.log.info("[Strapi Localize] Plugin initialized successfully");
@@ -277,29 +323,39 @@ var translate$1 = ({ strapi }) => ({
     }
     return { valid: true };
   },
-  validateId(id) {
-    if (!id) {
-      return { valid: false, error: "ID is required" };
+  /**
+   * Validate documentId (v5 format - string)
+   */
+  validateDocumentId(documentId) {
+    if (!documentId) {
+      return { valid: false, error: "documentId is required" };
     }
-    const numId = Number(id);
-    if (isNaN(numId) || numId <= 0) {
-      return { valid: false, error: "ID must be a positive number" };
+    if (typeof documentId !== "string") {
+      return { valid: false, error: "documentId must be a string" };
+    }
+    if (documentId.trim().length === 0) {
+      return { valid: false, error: "documentId cannot be empty" };
     }
     return { valid: true };
   },
+  /**
+   * Translate a single entry
+   * POST /admin/strapi-localize/translate
+   * Body: { documentId, model, targetLocale, sourceLocale? }
+   */
   async translate(ctx) {
     const startTime = Date.now();
-    const { id, model, targetLocale, sourceLocale } = ctx.request.body;
-    strapi.log.info(`[Strapi Localize] Translation request: model=${model}, id=${id}, target=${targetLocale}, source=${sourceLocale || "auto"}`);
+    const { documentId, model, targetLocale, sourceLocale } = ctx.request.body;
+    strapi.log.info(`[Strapi Localize] Translation request: model=${model}, documentId=${documentId}, target=${targetLocale}, source=${sourceLocale || "auto"}`);
     try {
-      if (!id || !model || !targetLocale) {
+      if (!documentId || !model || !targetLocale) {
         strapi.log.warn(`[Strapi Localize] Translation validation failed: Missing required parameters`);
-        return ctx.badRequest("Missing required parameters: id, model, targetLocale");
+        return ctx.badRequest("Missing required parameters: documentId, model, targetLocale");
       }
-      const idValidation = this.validateId(id);
-      if (!idValidation.valid) {
-        strapi.log.warn(`[Strapi Localize] Translation validation failed: ${idValidation.error}`);
-        return ctx.badRequest(idValidation.error);
+      const documentIdValidation = this.validateDocumentId(documentId);
+      if (!documentIdValidation.valid) {
+        strapi.log.warn(`[Strapi Localize] Translation validation failed: ${documentIdValidation.error}`);
+        return ctx.badRequest(documentIdValidation.error);
       }
       const modelValidation = this.validateContentModel(model);
       if (!modelValidation.valid) {
@@ -318,41 +374,46 @@ var translate$1 = ({ strapi }) => ({
           return ctx.badRequest(sourceLocaleValidation.error);
         }
       }
-      const result = await strapi.plugin("strapi-localize").service("deepl").translateContent(id, model, targetLocale, sourceLocale);
+      const result = await strapi.plugin("strapi-localize").service("translation").translateContent(documentId, model, targetLocale, sourceLocale);
       const duration = Date.now() - startTime;
-      strapi.log.info(`[Strapi Localize] Translation completed: model=${model}, id=${id}, duration=${duration}ms`);
+      strapi.log.info(`[Strapi Localize] Translation completed: model=${model}, documentId=${documentId}, duration=${duration}ms`);
       ctx.body = result;
     } catch (error) {
       const duration = Date.now() - startTime;
-      strapi.log.error(`[Strapi Localize] Translation error: model=${model}, id=${id}, duration=${duration}ms, error=${error.message}`);
+      strapi.log.error(`[Strapi Localize] Translation error: model=${model}, documentId=${documentId}, duration=${duration}ms, error=${error.message}`);
       ctx.throw(500, error.message || "Translation failed");
     }
   },
+  /**
+   * Translate multiple entries
+   * POST /admin/strapi-localize/translate-batch
+   * Body: { documentIds, model, targetLocale, sourceLocale? }
+   */
   async translateBatch(ctx) {
     const startTime = Date.now();
-    const { ids, model, targetLocale, sourceLocale } = ctx.request.body;
-    strapi.log.info(`[Strapi Localize] Batch translation request: model=${model}, count=${ids?.length || 0}, target=${targetLocale}, source=${sourceLocale || "auto"}`);
+    const { documentIds, model, targetLocale, sourceLocale } = ctx.request.body;
+    strapi.log.info(`[Strapi Localize] Batch translation request: model=${model}, count=${documentIds?.length || 0}, target=${targetLocale}, source=${sourceLocale || "auto"}`);
     try {
-      if (!ids || !model || !targetLocale) {
+      if (!documentIds || !model || !targetLocale) {
         strapi.log.warn(`[Strapi Localize] Batch translation validation failed: Missing required parameters`);
-        return ctx.badRequest("Missing required parameters: ids, model, targetLocale");
+        return ctx.badRequest("Missing required parameters: documentIds, model, targetLocale");
       }
-      if (!Array.isArray(ids)) {
-        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: ids must be an array`);
-        return ctx.badRequest("ids must be an array");
+      if (!Array.isArray(documentIds)) {
+        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: documentIds must be an array`);
+        return ctx.badRequest("documentIds must be an array");
       }
-      if (ids.length === 0) {
+      if (documentIds.length === 0) {
         strapi.log.warn(`[Strapi Localize] Batch translation validation failed: Empty array`);
-        return ctx.badRequest("ids array cannot be empty");
+        return ctx.badRequest("documentIds array cannot be empty");
       }
-      if (ids.length > 50) {
-        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: Batch size ${ids.length} exceeds maximum of 50`);
+      if (documentIds.length > 50) {
+        strapi.log.warn(`[Strapi Localize] Batch translation validation failed: Batch size ${documentIds.length} exceeds maximum of 50`);
         return ctx.badRequest("Maximum batch size is 50 items");
       }
-      for (const id of ids) {
-        const idValidation = this.validateId(id);
-        if (!idValidation.valid) {
-          return ctx.badRequest(`Invalid ID '${id}': ${idValidation.error}`);
+      for (const docId of documentIds) {
+        const docIdValidation = this.validateDocumentId(docId);
+        if (!docIdValidation.valid) {
+          return ctx.badRequest(`Invalid documentId '${docId}': ${docIdValidation.error}`);
         }
       }
       const modelValidation = this.validateContentModel(model);
@@ -369,10 +430,11 @@ var translate$1 = ({ strapi }) => ({
           return ctx.badRequest(sourceLocaleValidation.error);
         }
       }
+      const translationService = strapi.plugin("strapi-localize").service("translation");
       const results = await Promise.allSettled(
-        ids.map(
-          (id) => strapi.plugin("strapi-localize").service("deepl").translateContent(id, model, targetLocale, sourceLocale).catch((error) => ({
-            id,
+        documentIds.map(
+          (docId) => translationService.translateContent(docId, model, targetLocale, sourceLocale).catch((error) => ({
+            documentId: docId,
             error: error.message || "Translation failed",
             status: "failed"
           }))
@@ -382,19 +444,19 @@ var translate$1 = ({ strapi }) => ({
         if (result.status === "fulfilled") {
           if (result.value?.error) {
             return {
-              id: ids[index2],
+              documentId: documentIds[index2],
               status: "failed",
               error: result.value.error
             };
           }
           return {
-            id: result.value.id,
+            documentId: result.value.documentId,
             status: "success",
             data: result.value
           };
         } else {
           return {
-            id: ids[index2],
+            documentId: documentIds[index2],
             status: "failed",
             error: result.reason?.message || "Unknown error"
           };
@@ -403,25 +465,29 @@ var translate$1 = ({ strapi }) => ({
       const successCount = formattedResults.filter((r) => r.status === "success").length;
       const failureCount = formattedResults.filter((r) => r.status === "failed").length;
       const duration = Date.now() - startTime;
-      strapi.log.info(`[Strapi Localize] Batch translation completed: model=${model}, total=${ids.length}, successful=${successCount}, failed=${failureCount}, duration=${duration}ms`);
+      strapi.log.info(`[Strapi Localize] Batch translation completed: model=${model}, total=${documentIds.length}, successful=${successCount}, failed=${failureCount}, duration=${duration}ms`);
       if (failureCount > 0) {
-        const failedIds = formattedResults.filter((r) => r.status === "failed").map((r) => r.id);
-        strapi.log.warn(`[Strapi Localize] Failed translations for IDs: ${failedIds.join(", ")}`);
+        const failedIds = formattedResults.filter((r) => r.status === "failed").map((r) => r.documentId);
+        strapi.log.warn(`[Strapi Localize] Failed translations for documentIds: ${failedIds.join(", ")}`);
       }
       ctx.body = {
         results: formattedResults,
         summary: {
-          total: ids.length,
+          total: documentIds.length,
           successful: successCount,
           failed: failureCount
         }
       };
     } catch (error) {
       const duration = Date.now() - startTime;
-      strapi.log.error(`[Strapi Localize] Batch translation error: model=${model}, count=${ids?.length || 0}, duration=${duration}ms, error=${error.message}`);
+      strapi.log.error(`[Strapi Localize] Batch translation error: model=${model}, count=${documentIds?.length || 0}, duration=${duration}ms, error=${error.message}`);
       ctx.throw(500, error.message || "Batch translation failed");
     }
   },
+  /**
+   * Get available DeepL languages
+   * GET /admin/strapi-localize/languages
+   */
   async getLanguages(ctx) {
     try {
       const languages = await strapi.plugin("strapi-localize").service("deepl").getAvailableLanguages();
@@ -621,7 +687,10 @@ var deepl = ({ strapi }) => ({
     throw lastError;
   },
   isFreeApiKey(apiKey) {
-    return apiKey && apiKey.endsWith(":fx");
+    if (!apiKey || typeof apiKey !== "string") {
+      return false;
+    }
+    return apiKey.endsWith(":fx");
   },
   async getApiUrl(endpoint) {
     const apiKey = await this.getApiKey();
@@ -748,7 +817,7 @@ var deepl = ({ strapi }) => ({
       strapi.log.debug(`[Strapi Localize] Populate depth limit reached: depth=${depth}`);
       return "*";
     }
-    const populate = {};
+    const populate2 = {};
     if (!modelSchema || !modelSchema.attributes) {
       return "*";
     }
@@ -777,52 +846,52 @@ var deepl = ({ strapi }) => ({
       }
       if (attribute.type === "relation") {
         if (depth > 1) {
-          populate[attributeName] = { populate: "*" };
+          populate2[attributeName] = { populate: "*" };
         } else {
-          populate[attributeName] = true;
+          populate2[attributeName] = true;
         }
       }
       if (attribute.type === "media") {
-        populate[attributeName] = true;
+        populate2[attributeName] = true;
       }
       if (attribute.type === "component") {
         if (attribute.component && strapi.components[attribute.component]) {
           const componentSchema = strapi.components[attribute.component];
           strapi.log.debug(`[Strapi Localize] Building populate for component: ${attribute.component}, depth=${depth}`);
           if (depth > 1) {
-            populate[attributeName] = {
+            populate2[attributeName] = {
               populate: this.buildPopulateStrategy(componentSchema, depth - 1, maxDepth)
             };
           } else {
-            populate[attributeName] = { populate: "*" };
+            populate2[attributeName] = { populate: "*" };
           }
         } else {
-          populate[attributeName] = { populate: "*" };
+          populate2[attributeName] = { populate: "*" };
         }
       }
       if (attribute.type === "dynamiczone") {
-        populate[attributeName] = { on: {} };
+        populate2[attributeName] = { on: {} };
         if (attribute.components && Array.isArray(attribute.components)) {
           for (const componentName of attribute.components) {
             if (strapi.components[componentName]) {
               const componentSchema = strapi.components[componentName];
               strapi.log.debug(`[Strapi Localize] Building populate for dynamic zone component: ${componentName}, depth=${depth}`);
               if (depth > 1) {
-                populate[attributeName].on[componentName] = {
+                populate2[attributeName].on[componentName] = {
                   populate: this.buildPopulateStrategy(componentSchema, depth - 1, maxDepth)
                 };
               } else {
-                populate[attributeName].on[componentName] = { populate: "*" };
+                populate2[attributeName].on[componentName] = { populate: "*" };
               }
             } else {
               strapi.log.warn(`[Strapi Localize] Component schema not found: ${componentName}`);
-              populate[attributeName].on[componentName] = { populate: "*" };
+              populate2[attributeName].on[componentName] = { populate: "*" };
             }
           }
         }
       }
     }
-    return Object.keys(populate).length > 0 ? populate : "*";
+    return Object.keys(populate2).length > 0 ? populate2 : "*";
   },
   async translateObject(obj, targetLang, sourceLang = null, fieldsToIgnore = [], modelSchema = null) {
     const translated = {};
@@ -1060,15 +1129,15 @@ var deepl = ({ strapi }) => ({
     const existingGlossaries = await this.listGlossaries();
     const glossariesByLangPair = {};
     for (const entry of glossary) {
-      for (const [targetLang, translation] of Object.entries(entry.translations || {})) {
-        if (!translation) continue;
+      for (const [targetLang, translation2] of Object.entries(entry.translations || {})) {
+        if (!translation2) continue;
         const key = `en_${targetLang}`;
         if (!glossariesByLangPair[key]) {
           glossariesByLangPair[key] = [];
         }
         glossariesByLangPair[key].push({
           term: entry.term,
-          translation
+          translation: translation2
         });
       }
     }
@@ -1228,9 +1297,655 @@ var settings = ({ strapi }) => ({
   }
 });
 const settings$1 = /* @__PURE__ */ getDefaultExportFromCjs(settings);
+var i18n = ({ strapi }) => ({
+  /**
+   * Get all available locales from Strapi i18n plugin
+   * @returns {Promise<Array>} Array of locale objects
+   */
+  async getLocales() {
+    return strapi.plugin("i18n").service("locales").find();
+  },
+  /**
+   * Get the default locale code
+   * @returns {Promise<string>} Default locale code (e.g., 'en')
+   */
+  async getDefaultLocaleCode() {
+    return strapi.plugin("i18n").service("locales").getDefaultLocale();
+  },
+  /**
+   * Check if a locale exists in Strapi
+   * @param {string} localeCode - Locale code to check
+   * @returns {Promise<boolean>}
+   */
+  async localeExists(localeCode) {
+    const locales = await this.getLocales();
+    return locales.some((l) => l.code === localeCode);
+  },
+  /**
+   * Get an entry in a specific locale using Documents API
+   * @param {string} uid - Content type UID
+   * @param {string} documentId - Document ID
+   * @param {string} locale - Target locale
+   * @param {object} populate - Population strategy
+   * @returns {Promise<object|null>}
+   */
+  async getEntryInLocale(uid, documentId, locale, populate2 = "*") {
+    try {
+      const entry = await strapi.documents(uid).findOne({
+        documentId,
+        locale,
+        populate: populate2
+      });
+      return entry;
+    } catch (error) {
+      strapi.log.debug(`[Strapi Localize] Entry not found in locale: uid=${uid}, documentId=${documentId}, locale=${locale}`);
+      return null;
+    }
+  },
+  /**
+   * Create a localization for an existing entry (v5 Documents API)
+   * @param {string} uid - Content type UID
+   * @param {object} baseEntry - Source entry (with documentId)
+   * @param {object} newEntryData - Translated data
+   * @param {string} targetLocale - Target locale code
+   * @returns {Promise<object>}
+   */
+  async createLocalization(uid, baseEntry, newEntryData, targetLocale) {
+    try {
+      strapi.log.debug(`[Strapi Localize] Creating localization: uid=${uid}, documentId=${baseEntry.documentId}, locale=${targetLocale}`);
+      const cleanData = this.omitSystemFields(newEntryData);
+      cleanData.publishedAt = null;
+      const createdEntry = await strapi.documents(uid).create({
+        locale: targetLocale,
+        data: cleanData
+      });
+      strapi.log.info(`[Strapi Localize] Localization created: uid=${uid}, documentId=${createdEntry.documentId}, locale=${targetLocale}`);
+      return createdEntry;
+    } catch (error) {
+      strapi.log.error(`[Strapi Localize] Failed to create localization: ${error.message}`);
+      throw error;
+    }
+  },
+  /**
+   * Update an existing localization (v5 Documents API)
+   * @param {string} uid - Content type UID
+   * @param {string} documentId - Document ID to update
+   * @param {object} data - Updated data
+   * @param {string} locale - Locale of the document
+   * @returns {Promise<object>}
+   */
+  async updateLocalization(uid, documentId, data, locale) {
+    try {
+      strapi.log.debug(`[Strapi Localize] Updating localization: uid=${uid}, documentId=${documentId}, locale=${locale}`);
+      const cleanData = this.omitSystemFields(data);
+      const updatedEntry = await strapi.documents(uid).update({
+        documentId,
+        locale,
+        data: cleanData
+      });
+      strapi.log.info(`[Strapi Localize] Localization updated: uid=${uid}, documentId=${documentId}, locale=${locale}`);
+      return updatedEntry;
+    } catch (error) {
+      strapi.log.error(`[Strapi Localize] Failed to update localization: ${error.message}`);
+      throw error;
+    }
+  },
+  /**
+   * Check if a localization exists for a document in a specific locale
+   * @param {string} uid - Content type UID
+   * @param {string} documentId - Document ID
+   * @param {string} locale - Target locale
+   * @returns {Promise<object|null>}
+   */
+  async getExistingLocalization(uid, documentId, locale) {
+    try {
+      const entry = await strapi.documents(uid).findOne({
+        documentId,
+        locale
+      });
+      return entry;
+    } catch (error) {
+      return null;
+    }
+  },
+  /**
+   * Remove system fields that should not be copied during translation
+   * @param {object} data - Data object
+   * @returns {object} Cleaned data
+   */
+  omitSystemFields(data) {
+    const systemFields = [
+      "id",
+      "documentId",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+      "createdBy",
+      "updatedBy",
+      "locale",
+      "localizations"
+    ];
+    const cleaned = { ...data };
+    for (const field of systemFields) {
+      delete cleaned[field];
+    }
+    return cleaned;
+  },
+  /**
+   * Recursively remove system fields from nested objects
+   * @param {object} obj - Object to clean
+   * @param {Array<string>} keys - Keys to remove
+   * @returns {object} Cleaned object
+   */
+  omitDeep(obj, keys = ["id", "documentId", "createdAt", "updatedAt", "publishedAt", "createdBy", "updatedBy"]) {
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.omitDeep(item, keys));
+    }
+    if (obj !== null && typeof obj === "object") {
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (keys.includes(key)) {
+          continue;
+        }
+        result[key] = this.omitDeep(value, keys);
+      }
+      return result;
+    }
+    return obj;
+  },
+  /**
+   * Remove documentId from all nested objects except media objects
+   * Media objects need documentId preserved for proper linking
+   * @param {object} obj - Object to process
+   * @returns {object} Processed object
+   */
+  dropDocumentIdExceptMedia(obj) {
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.dropDocumentIdExceptMedia(item));
+    }
+    if (obj !== null && typeof obj === "object") {
+      const isMedia2 = obj.mime || obj.url || obj.provider;
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (key === "documentId" && !isMedia2) {
+          continue;
+        }
+        result[key] = this.dropDocumentIdExceptMedia(value);
+      }
+      return result;
+    }
+    return obj;
+  }
+});
+const i18n$1 = /* @__PURE__ */ getDefaultExportFromCjs(i18n);
+const DEFAULT_DEPTH = 6;
+const getModelPopulationAttributes = (model) => {
+  if (model.uid === "plugin::upload.file") {
+    const { related, ...attributes } = model.attributes;
+    return attributes;
+  }
+  return model.attributes;
+};
+const buildPopulateObject$1 = (strapi, modelUid, maxDepth = DEFAULT_DEPTH, ignore = ["localizations", "createdBy", "updatedBy"]) => {
+  if (maxDepth <= 1) {
+    return true;
+  }
+  if (modelUid === "admin::user") {
+    return void 0;
+  }
+  const populate2 = {};
+  const model = strapi.getModel(modelUid);
+  if (!model) {
+    return void 0;
+  }
+  if (ignore && !ignore.includes(model.collectionName)) {
+    ignore.push(model.collectionName);
+  }
+  const attributes = getModelPopulationAttributes(model);
+  for (const [key, value] of Object.entries(attributes)) {
+    if (ignore?.includes(key)) continue;
+    if (value.type === "component") {
+      const componentPopulate = buildPopulateObject$1(strapi, value.component, maxDepth - 1, ignore);
+      if (componentPopulate) {
+        populate2[key] = componentPopulate;
+      }
+    } else if (value.type === "dynamiczone") {
+      const dynamicPopulate = {};
+      for (const componentName of value.components || []) {
+        const componentPop = buildPopulateObject$1(strapi, componentName, maxDepth - 1, ignore);
+        if (componentPop) {
+          dynamicPopulate[componentName] = componentPop;
+        }
+      }
+      populate2[key] = Object.keys(dynamicPopulate).length > 0 ? { on: dynamicPopulate } : true;
+    } else if (value.type === "relation") {
+      const relationPopulate = buildPopulateObject$1(strapi, value.target, 1, ignore);
+      if (relationPopulate) {
+        populate2[key] = relationPopulate;
+      }
+    } else if (value.type === "media") {
+      populate2[key] = true;
+    }
+  }
+  return Object.keys(populate2).length > 0 ? { populate: populate2 } : true;
+};
+var populate = {
+  buildPopulateObject: buildPopulateObject$1
+};
+const getAttribute$1 = (model, attribute) => {
+  if (!model || !model.attributes) {
+    return void 0;
+  }
+  return model.attributes[attribute];
+};
+const isComponent$2 = (attributeObj) => {
+  return attributeObj?.type === "component";
+};
+const isDynamicZone$2 = (attributeObj) => {
+  return attributeObj?.type === "dynamiczone";
+};
+const isRepeatable$1 = (attributeObj) => {
+  return isComponent$2(attributeObj) && !!attributeObj.repeatable;
+};
+const isRelation$2 = (attributeObj) => {
+  return attributeObj?.type === "relation" && attributeObj?.target !== "plugin::upload.file";
+};
+const isMedia$1 = (attributeObj) => {
+  return attributeObj?.type === "media" || attributeObj?.type === "relation" && attributeObj?.target === "plugin::upload.file";
+};
+const isTranslatable$1 = (attributeObj) => {
+  const translatableTypes = ["string", "text", "richtext", "blocks"];
+  return translatableTypes.includes(attributeObj?.type);
+};
+var modelUtils = {
+  getAttribute: getAttribute$1,
+  isComponent: isComponent$2,
+  isDynamicZone: isDynamicZone$2,
+  isRepeatable: isRepeatable$1,
+  isRelation: isRelation$2,
+  isMedia: isMedia$1,
+  isTranslatable: isTranslatable$1
+};
+const {
+  getAttribute,
+  isRelation: isRelation$1,
+  isComponent: isComponent$1,
+  isDynamicZone: isDynamicZone$1,
+  isRepeatable
+} = modelUtils;
+const findLocalizedRelation = async (strapi, targetUid, documentId, targetLocale) => {
+  if (!documentId) {
+    return null;
+  }
+  try {
+    const localizedEntry = await strapi.documents(targetUid).findOne({
+      documentId,
+      locale: targetLocale
+    });
+    if (localizedEntry) {
+      strapi.log.debug(`[Strapi Localize] Found localized relation: uid=${targetUid}, documentId=${documentId}, locale=${targetLocale}`);
+      return localizedEntry;
+    }
+    strapi.log.debug(`[Strapi Localize] No localized relation found: uid=${targetUid}, documentId=${documentId}, locale=${targetLocale}`);
+    return null;
+  } catch (error) {
+    strapi.log.warn(`[Strapi Localize] Failed to find localized relation: ${error.message}`);
+    return null;
+  }
+};
+const processRelations = async (strapi, data, sourceData, modelSchema, targetLocale) => {
+  const result = { ...data };
+  if (!modelSchema || !modelSchema.attributes) {
+    return result;
+  }
+  for (const [key, attribute] of Object.entries(modelSchema.attributes)) {
+    if (isRelation$1(attribute)) {
+      const sourceValue = sourceData[key];
+      if (!sourceValue) {
+        continue;
+      }
+      const targetUid = attribute.target;
+      const localizedDocumentIds = [];
+      const items = Array.isArray(sourceValue) ? sourceValue : [sourceValue];
+      for (const item of items) {
+        if (!item || typeof item !== "object") {
+          continue;
+        }
+        const documentId = item.documentId;
+        if (!documentId) {
+          continue;
+        }
+        const localizedEntry = await findLocalizedRelation(strapi, targetUid, documentId, targetLocale);
+        if (localizedEntry) {
+          localizedDocumentIds.push(localizedEntry.documentId);
+        }
+      }
+      if (localizedDocumentIds.length > 0) {
+        if (Array.isArray(sourceValue)) {
+          result[key] = localizedDocumentIds;
+        } else {
+          result[key] = localizedDocumentIds[0];
+        }
+        strapi.log.debug(`[Strapi Localize] Set localized relation: key=${key}, count=${localizedDocumentIds.length}`);
+      } else {
+        delete result[key];
+        strapi.log.debug(`[Strapi Localize] Removed relation (no localized version): key=${key}`);
+      }
+    }
+  }
+  return result;
+};
+const processRelationsDeep$1 = async (strapi, data, sourceData, modelSchema, targetLocale) => {
+  if (!data || typeof data !== "object") {
+    return data;
+  }
+  let result = { ...data };
+  result = await processRelations(strapi, result, sourceData, modelSchema, targetLocale);
+  if (!modelSchema || !modelSchema.attributes) {
+    return result;
+  }
+  for (const [key, attribute] of Object.entries(modelSchema.attributes)) {
+    if (!result[key] || !sourceData[key]) {
+      continue;
+    }
+    if (isComponent$1(attribute)) {
+      const componentSchema = strapi.components[attribute.component];
+      if (!componentSchema) {
+        continue;
+      }
+      if (isRepeatable(attribute)) {
+        const processedItems = [];
+        const sourceItems = Array.isArray(sourceData[key]) ? sourceData[key] : [];
+        const dataItems = Array.isArray(result[key]) ? result[key] : [];
+        for (let i = 0; i < dataItems.length; i++) {
+          const sourceItem = sourceItems[i] || {};
+          const processedItem = await processRelationsDeep$1(
+            strapi,
+            dataItems[i],
+            sourceItem,
+            componentSchema,
+            targetLocale
+          );
+          processedItems.push(processedItem);
+        }
+        result[key] = processedItems;
+      } else {
+        result[key] = await processRelationsDeep$1(
+          strapi,
+          result[key],
+          sourceData[key],
+          componentSchema,
+          targetLocale
+        );
+      }
+    } else if (isDynamicZone$1(attribute)) {
+      const processedItems = [];
+      const sourceItems = Array.isArray(sourceData[key]) ? sourceData[key] : [];
+      const dataItems = Array.isArray(result[key]) ? result[key] : [];
+      for (let i = 0; i < dataItems.length; i++) {
+        const item = dataItems[i];
+        const sourceItem = sourceItems[i] || {};
+        if (item && item.__component) {
+          const componentSchema = strapi.components[item.__component];
+          if (componentSchema) {
+            const processedItem = await processRelationsDeep$1(
+              strapi,
+              item,
+              sourceItem,
+              componentSchema,
+              targetLocale
+            );
+            processedItems.push(processedItem);
+          } else {
+            processedItems.push(item);
+          }
+        } else {
+          processedItems.push(item);
+        }
+      }
+      result[key] = processedItems;
+    }
+  }
+  return result;
+};
+var relationHandler = {
+  processRelationsDeep: processRelationsDeep$1
+};
+const { buildPopulateObject } = populate;
+const { processRelationsDeep } = relationHandler;
+const {
+  isComponent,
+  isDynamicZone,
+  isTranslatable,
+  isMedia,
+  isRelation
+} = modelUtils;
+var translation = ({ strapi }) => ({
+  /**
+   * Translate content from source locale to target locale
+   * Uses Documents API (v5 pattern)
+   *
+   * @param {string} documentId - Document ID to translate
+   * @param {string} uid - Content type UID
+   * @param {string} targetLocale - Target locale code
+   * @param {string} sourceLocale - Source locale code (optional)
+   * @returns {Promise<object>} Translated entry
+   */
+  async translateContent(documentId, uid, targetLocale, sourceLocale = null) {
+    const startTime = Date.now();
+    strapi.log.info(`[Strapi Localize] Starting translation: uid=${uid}, documentId=${documentId}, source=${sourceLocale || "auto"}, target=${targetLocale}`);
+    const i18nService = strapi.plugin("strapi-localize").service("i18n");
+    const deeplService = strapi.plugin("strapi-localize").service("deepl");
+    const settingsService = strapi.plugin("strapi-localize").service("settings");
+    const modelSchema = strapi.getModel(uid);
+    if (!modelSchema) {
+      throw new Error(`Model schema not found: ${uid}`);
+    }
+    const effectiveSourceLocale = sourceLocale || await i18nService.getDefaultLocaleCode();
+    const populateStrategy = buildPopulateObject(strapi, uid);
+    strapi.log.debug(`[Strapi Localize] Populate strategy: ${JSON.stringify(populateStrategy).substring(0, 300)}...`);
+    const sourceEntry = await strapi.documents(uid).findOne({
+      documentId,
+      locale: effectiveSourceLocale,
+      ...populateStrategy
+    });
+    if (!sourceEntry) {
+      throw new Error(`Entry not found: uid=${uid}, documentId=${documentId}, locale=${effectiveSourceLocale}`);
+    }
+    strapi.log.debug(`[Strapi Localize] Fetched source entry: documentId=${sourceEntry.documentId}`);
+    const settings2 = await settingsService.getSettings();
+    const contentTypeConfig = settings2?.contentTypes?.[uid] || {};
+    const ignoredFields = contentTypeConfig.ignoredFields || [];
+    const systemFields = [
+      "id",
+      "documentId",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+      "createdBy",
+      "updatedBy",
+      "locale",
+      "localizations"
+    ];
+    const allFieldsToIgnore = [.../* @__PURE__ */ new Set([...systemFields, ...ignoredFields])];
+    const translatedData = await this.translateObject(
+      deeplService,
+      sourceEntry,
+      targetLocale,
+      effectiveSourceLocale,
+      allFieldsToIgnore,
+      modelSchema
+    );
+    const dataWithLocalizedRelations = await processRelationsDeep(
+      strapi,
+      translatedData,
+      sourceEntry,
+      modelSchema,
+      targetLocale
+    );
+    const cleanedData = i18nService.omitSystemFields(dataWithLocalizedRelations);
+    const finalData = i18nService.dropDocumentIdExceptMedia(cleanedData);
+    const existingTranslation = await i18nService.getExistingLocalization(uid, documentId, targetLocale);
+    let result;
+    if (existingTranslation) {
+      strapi.log.debug(`[Strapi Localize] Updating existing translation: documentId=${documentId}`);
+      result = await i18nService.updateLocalization(uid, documentId, finalData, targetLocale);
+    } else {
+      strapi.log.debug(`[Strapi Localize] Creating new translation: documentId=${documentId}`);
+      result = await i18nService.createLocalization(uid, sourceEntry, finalData, targetLocale);
+    }
+    const duration = Date.now() - startTime;
+    strapi.log.info(`[Strapi Localize] Translation completed: uid=${uid}, documentId=${documentId}, target=${targetLocale}, duration=${duration}ms`);
+    return result;
+  },
+  /**
+   * Recursively translate an object's translatable fields
+   *
+   * @param {object} deeplService - DeepL service instance
+   * @param {object} obj - Object to translate
+   * @param {string} targetLang - Target language code
+   * @param {string} sourceLang - Source language code
+   * @param {Array<string>} fieldsToIgnore - Fields to skip
+   * @param {object} modelSchema - Model schema
+   * @returns {Promise<object>} Translated object
+   */
+  async translateObject(deeplService, obj, targetLang, sourceLang, fieldsToIgnore, modelSchema) {
+    const translated = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (fieldsToIgnore.includes(key) || ["id", "__component", "__typename", "documentId"].includes(key)) {
+        translated[key] = value;
+        continue;
+      }
+      const fieldSchema = modelSchema?.attributes?.[key];
+      if (this.shouldTranslateField(value, fieldSchema)) {
+        translated[key] = await deeplService.translate(value, targetLang, sourceLang);
+      } else if (Array.isArray(value)) {
+        translated[key] = await this.translateArray(
+          deeplService,
+          value,
+          targetLang,
+          sourceLang,
+          fieldsToIgnore,
+          fieldSchema
+        );
+      } else if (typeof value === "object" && value !== null) {
+        translated[key] = await this.translateNestedObject(
+          deeplService,
+          value,
+          targetLang,
+          sourceLang,
+          fieldsToIgnore,
+          fieldSchema
+        );
+      } else {
+        translated[key] = value;
+      }
+    }
+    return translated;
+  },
+  /**
+   * Check if a field should be translated
+   */
+  shouldTranslateField(value, fieldSchema) {
+    if (typeof value !== "string" || !value.trim()) {
+      return false;
+    }
+    if (fieldSchema) {
+      return isTranslatable(fieldSchema);
+    }
+    return true;
+  },
+  /**
+   * Translate an array field
+   */
+  async translateArray(deeplService, array, targetLang, sourceLang, fieldsToIgnore, fieldSchema) {
+    const results = [];
+    for (const item of array) {
+      if (typeof item === "string") {
+        results.push(await deeplService.translate(item, targetLang, sourceLang));
+      } else if (typeof item === "object" && item !== null) {
+        if (item.__component) {
+          const componentSchema = strapi.components[item.__component];
+          if (componentSchema) {
+            const translated = await this.translateObject(
+              deeplService,
+              item,
+              targetLang,
+              sourceLang,
+              fieldsToIgnore,
+              componentSchema
+            );
+            results.push(translated);
+          } else {
+            results.push(item);
+          }
+        } else if (item.documentId && !item.__component) {
+          results.push(item);
+        } else {
+          results.push(item);
+        }
+      } else {
+        results.push(item);
+      }
+    }
+    return results;
+  },
+  /**
+   * Translate a nested object field
+   */
+  async translateNestedObject(deeplService, obj, targetLang, sourceLang, fieldsToIgnore, fieldSchema) {
+    if (obj.__component) {
+      const componentSchema = strapi.components[obj.__component];
+      if (componentSchema) {
+        return await this.translateObject(
+          deeplService,
+          obj,
+          targetLang,
+          sourceLang,
+          fieldsToIgnore,
+          componentSchema
+        );
+      }
+      return obj;
+    }
+    if (obj.documentId && !obj.__component) {
+      return obj;
+    }
+    if (obj.mime || obj.url || obj.provider) {
+      return obj;
+    }
+    if (fieldSchema && isComponent(fieldSchema)) {
+      const componentSchema = strapi.components[fieldSchema.component];
+      if (componentSchema) {
+        return await this.translateObject(
+          deeplService,
+          obj,
+          targetLang,
+          sourceLang,
+          fieldsToIgnore,
+          componentSchema
+        );
+      }
+    }
+    if (fieldSchema && typeof obj === "object") {
+      return await this.translateObject(
+        deeplService,
+        obj,
+        targetLang,
+        sourceLang,
+        fieldsToIgnore,
+        fieldSchema
+      );
+    }
+    return obj;
+  }
+});
+const translation$1 = /* @__PURE__ */ getDefaultExportFromCjs(translation);
 const services = {
   deepl: deepl$1,
-  settings: settings$1
+  settings: settings$1,
+  i18n: i18n$1,
+  translation: translation$1
 };
 const index = {
   bootstrap: bootstrap$1,

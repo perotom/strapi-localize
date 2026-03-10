@@ -37,7 +37,10 @@ module.exports = ({ strapi }) => ({
   },
   isFreeApiKey(apiKey) {
     // Free API keys end with :fx
-    return apiKey && apiKey.endsWith(':fx');
+    if (!apiKey || typeof apiKey !== 'string') {
+      return false;
+    }
+    return apiKey.endsWith(':fx');
   },
 
   async getApiUrl(endpoint) {

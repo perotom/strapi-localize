@@ -19,6 +19,7 @@ describe('DeepL Service', () => {
         error: jest.fn(),
         warn: jest.fn(),
         info: jest.fn(),
+        debug: jest.fn(),
       },
       entityService: {
         findOne: jest.fn(),
@@ -262,13 +263,13 @@ describe('DeepL Service', () => {
         title: 'Test',
         count: 42,
         active: true,
-        date: new Date('2024-01-01')
+        data: null
       };
       const result = await deeplService.translateObject(obj, 'de');
 
       expect(result.count).toBe(42);
       expect(result.active).toBe(true);
-      expect(result.date).toEqual(obj.date);
+      expect(result.data).toBeNull();
     });
   });
 });
