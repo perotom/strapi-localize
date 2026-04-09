@@ -101,11 +101,15 @@ module.exports = ({ strapi }) => ({
       targetLocale
     );
 
-    // Clean system fields
+    // Clean system fields (top-level)
     const cleanedData = i18nService.omitSystemFields(dataWithLocalizedRelations);
 
     // Remove documentId from nested objects (except media)
-    const finalData = i18nService.dropDocumentIdExceptMedia(cleanedData);
+    const withoutDocIds = i18nService.dropDocumentIdExceptMedia(cleanedData);
+
+    // Strip id from nested component objects (source component ids don't belong to the
+    // target locale entity — Strapi rejects them). Preserve media ids for linking.
+    const finalData = this.stripComponentIds(withoutDocIds);
 
     // Check if translation already exists
     const existingTranslation = await i18nService.getExistingLocalization(uid, documentId, targetLocale);
@@ -356,5 +360,29 @@ module.exports = ({ strapi }) => ({
     }
 
     return translated;
+  },
+
+  /**
+   * Recursively strip `id` from component/dynamic-zone objects.
+   * Media objects (have mime/url/provider) keep their id for linking.
+   */
+  stripComponentIds(obj) {
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.stripComponentIds(item));
+    }
+
+    if (obj !== null && typeof obj === 'object') {
+      const isMedia = obj.mime || obj.url || obj.provider;
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (key === 'id' && !isMedia) {
+          continue;
+        }
+        result[key] = this.stripComponentIds(value);
+      }
+      return result;
+    }
+
+    return obj;
   },
 });

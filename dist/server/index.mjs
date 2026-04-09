@@ -1813,7 +1813,8 @@ var translation = ({ strapi }) => ({
       targetLocale
     );
     const cleanedData = i18nService.omitSystemFields(dataWithLocalizedRelations);
-    const finalData = i18nService.dropDocumentIdExceptMedia(cleanedData);
+    const withoutDocIds = i18nService.dropDocumentIdExceptMedia(cleanedData);
+    const finalData = this.stripComponentIds(withoutDocIds);
     const existingTranslation = await i18nService.getExistingLocalization(uid, documentId, targetLocale);
     let result;
     if (existingTranslation) {
@@ -2010,6 +2011,27 @@ var translation = ({ strapi }) => ({
       }
     }
     return translated;
+  },
+  /**
+   * Recursively strip `id` from component/dynamic-zone objects.
+   * Media objects (have mime/url/provider) keep their id for linking.
+   */
+  stripComponentIds(obj) {
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.stripComponentIds(item));
+    }
+    if (obj !== null && typeof obj === "object") {
+      const isMedia2 = obj.mime || obj.url || obj.provider;
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (key === "id" && !isMedia2) {
+          continue;
+        }
+        result[key] = this.stripComponentIds(value);
+      }
+      return result;
+    }
+    return obj;
   }
 });
 const translation$1 = /* @__PURE__ */ getDefaultExportFromCjs(translation);
