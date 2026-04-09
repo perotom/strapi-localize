@@ -121,6 +121,19 @@ module.exports = ({ strapi }) => ({
       result = await i18nService.createLocalization(uid, sourceEntry, finalData, targetLocale);
     }
 
+    // If source was published, publish the translated locale too
+    if (sourceEntry.publishedAt) {
+      try {
+        await strapi.documents(uid).publish({
+          documentId,
+          locale: targetLocale,
+        });
+        strapi.log.info(`[Strapi Localize] Published translated locale: uid=${uid}, documentId=${documentId}, locale=${targetLocale}`);
+      } catch (pubError) {
+        strapi.log.error(`[Strapi Localize] Failed to publish translated locale: ${pubError.message}`);
+      }
+    }
+
     const duration = Date.now() - startTime;
     strapi.log.info(`[Strapi Localize] Translation completed: uid=${uid}, documentId=${documentId}, target=${targetLocale}, duration=${duration}ms`);
 
@@ -152,7 +165,10 @@ module.exports = ({ strapi }) => ({
       const fieldSchema = modelSchema?.attributes?.[key];
 
       // Handle different field types
-      if (this.shouldTranslateField(value, fieldSchema)) {
+      if (fieldSchema?.type === 'blocks' && Array.isArray(value)) {
+        // Blocks-type content: structured JSON with nested text nodes
+        translated[key] = await this.translateBlocks(deeplService, value, targetLang, sourceLang);
+      } else if (this.shouldTranslateField(value, fieldSchema)) {
         // Translate string fields
         translated[key] = await deeplService.translate(value, targetLang, sourceLang);
       } else if (Array.isArray(value)) {
@@ -301,5 +317,44 @@ module.exports = ({ strapi }) => ({
     }
 
     return obj;
+  },
+
+  /**
+   * Translate Strapi blocks-type content.
+   * Blocks are a JSON array of nodes (heading, paragraph, list, etc.)
+   * each containing a `children` array with text/link nodes.
+   * We walk the tree and translate every `text` property.
+   */
+  async translateBlocks(deeplService, blocks, targetLang, sourceLang) {
+    if (!Array.isArray(blocks)) return blocks;
+
+    const results = [];
+    for (const block of blocks) {
+      results.push(await this.translateBlockNode(deeplService, block, targetLang, sourceLang));
+    }
+    return results;
+  },
+
+  async translateBlockNode(deeplService, node, targetLang, sourceLang) {
+    if (!node || typeof node !== 'object') return node;
+
+    const translated = { ...node };
+
+    // Translate the text property if present and non-empty
+    if (typeof translated.text === 'string' && translated.text.trim()) {
+      translated.text = await deeplService.translate(translated.text, targetLang, sourceLang);
+    }
+
+    // Recurse into children (paragraphs, headings, links, list-items, etc.)
+    if (Array.isArray(translated.children)) {
+      translated.children = [];
+      for (const child of node.children) {
+        translated.children.push(
+          await this.translateBlockNode(deeplService, child, targetLang, sourceLang)
+        );
+      }
+    }
+
+    return translated;
   },
 });
