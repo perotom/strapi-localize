@@ -1773,11 +1773,19 @@ var translation = ({ strapi }) => ({
     const effectiveSourceLocale = sourceLocale || await i18nService.getDefaultLocaleCode();
     const populateStrategy = buildPopulateObject(strapi, uid);
     strapi.log.debug(`[Strapi Localize] Populate strategy: ${JSON.stringify(populateStrategy).substring(0, 300)}...`);
-    const sourceEntry = await strapi.documents(uid).findOne({
+    let sourceEntry = await strapi.documents(uid).findOne({
       documentId,
       locale: effectiveSourceLocale,
+      status: "published",
       ...populateStrategy
     });
+    if (!sourceEntry) {
+      sourceEntry = await strapi.documents(uid).findOne({
+        documentId,
+        locale: effectiveSourceLocale,
+        ...populateStrategy
+      });
+    }
     if (!sourceEntry) {
       throw new Error(`Entry not found: uid=${uid}, documentId=${documentId}, locale=${effectiveSourceLocale}`);
     }

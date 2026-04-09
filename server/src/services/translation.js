@@ -50,11 +50,22 @@ module.exports = ({ strapi }) => ({
     strapi.log.debug(`[Strapi Localize] Populate strategy: ${JSON.stringify(populateStrategy).substring(0, 300)}...`);
 
     // Fetch source entry using Documents API
-    const sourceEntry = await strapi.documents(uid).findOne({
+    // Try published version first (publish triggers translation, and the draft may be stale),
+    // fall back to draft if no published version exists (e.g. save-only trigger)
+    let sourceEntry = await strapi.documents(uid).findOne({
       documentId,
       locale: effectiveSourceLocale,
+      status: 'published',
       ...populateStrategy,
     });
+
+    if (!sourceEntry) {
+      sourceEntry = await strapi.documents(uid).findOne({
+        documentId,
+        locale: effectiveSourceLocale,
+        ...populateStrategy,
+      });
+    }
 
     if (!sourceEntry) {
       throw new Error(`Entry not found: uid=${uid}, documentId=${documentId}, locale=${effectiveSourceLocale}`);
