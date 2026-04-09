@@ -136,23 +136,10 @@ module.exports = ({ strapi }) => ({
       result = await i18nService.createLocalization(uid, sourceEntry, finalData, targetLocale);
     }
 
-    // If source was published, publish the translated locale too
-    if (sourceEntry.publishedAt) {
-      try {
-        await strapi.documents(uid).publish({
-          documentId,
-          locale: targetLocale,
-        });
-        strapi.log.info(`[Strapi Localize] Published translated locale: uid=${uid}, documentId=${documentId}, locale=${targetLocale}`);
-      } catch (pubError) {
-        strapi.log.error(`[Strapi Localize] Failed to publish translated locale: ${pubError.message}`);
-      }
-    }
-
     const duration = Date.now() - startTime;
     strapi.log.info(`[Strapi Localize] Translation completed: uid=${uid}, documentId=${documentId}, target=${targetLocale}, duration=${duration}ms`);
 
-    return result;
+    return { result, sourceWasPublished: !!sourceEntry.publishedAt };
   },
 
   /**

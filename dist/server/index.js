@@ -12,6 +12,7 @@ var bootstrap = async ({ strapi }) => {
   const translationQueue = [];
   const processingSet = /* @__PURE__ */ new Set();
   const QUEUE_PROCESS_INTERVAL = 5e3;
+  let isPluginWriting = false;
   const recentTranslations = /* @__PURE__ */ new Map();
   const DEBOUNCE_MS = 1e4;
   const processQueue = async () => {
@@ -50,21 +51,40 @@ var bootstrap = async ({ strapi }) => {
       strapi.log.info(`[Strapi Localize] Auto-translate starting: model=${uid}, documentId=${documentId}, source=${sourceLocale}, targets=[${targetLocales.map((l) => l.code).join(", ")}]`);
       let successCount = 0;
       let failCount = 0;
-      for (const targetLocale of targetLocales) {
-        try {
-          await translationService.translateContent(
-            documentId,
-            uid,
-            targetLocale.code,
-            sourceLocale
-            // Always translate FROM the default/source locale
-          );
-          strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
-          successCount++;
-        } catch (error) {
-          strapi.log.error(`[Strapi Localize] Auto-translation failed: target=${targetLocale.code}, error=${error.message}`);
-          failCount++;
+      let shouldPublish = false;
+      const successfulLocales = [];
+      isPluginWriting = true;
+      try {
+        for (const targetLocale of targetLocales) {
+          try {
+            const { sourceWasPublished } = await translationService.translateContent(
+              documentId,
+              uid,
+              targetLocale.code,
+              sourceLocale
+              // Always translate FROM the default/source locale
+            );
+            strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
+            successCount++;
+            successfulLocales.push(targetLocale.code);
+            if (sourceWasPublished) shouldPublish = true;
+          } catch (error) {
+            strapi.log.error(`[Strapi Localize] Auto-translation failed: target=${targetLocale.code}, error=${error.message}`);
+            failCount++;
+          }
         }
+        if (shouldPublish && successfulLocales.length > 0) {
+          for (const locale of successfulLocales) {
+            try {
+              await strapi.documents(uid).publish({ documentId, locale });
+              strapi.log.info(`[Strapi Localize] Published locale: ${locale}`);
+            } catch (pubError) {
+              strapi.log.error(`[Strapi Localize] Failed to publish locale ${locale}: ${pubError.message}`);
+            }
+          }
+        }
+      } finally {
+        isPluginWriting = false;
       }
       strapi.log.info(`[Strapi Localize] Auto-translate completed: successful=${successCount}, failed=${failCount}`);
     } catch (error) {
@@ -100,6 +120,9 @@ var bootstrap = async ({ strapi }) => {
   };
   initDefaultLocale();
   const scheduleTranslation = (event, hookType) => {
+    if (isPluginWriting) {
+      return;
+    }
     const { model, result } = event;
     if (!result || !result.documentId) {
       return;
@@ -1836,20 +1859,9 @@ var translation = ({ strapi }) => ({
       strapi.log.debug(`[Strapi Localize] Creating new translation: documentId=${documentId}`);
       result = await i18nService.createLocalization(uid, sourceEntry, finalData, targetLocale);
     }
-    if (sourceEntry.publishedAt) {
-      try {
-        await strapi.documents(uid).publish({
-          documentId,
-          locale: targetLocale
-        });
-        strapi.log.info(`[Strapi Localize] Published translated locale: uid=${uid}, documentId=${documentId}, locale=${targetLocale}`);
-      } catch (pubError) {
-        strapi.log.error(`[Strapi Localize] Failed to publish translated locale: ${pubError.message}`);
-      }
-    }
     const duration = Date.now() - startTime;
     strapi.log.info(`[Strapi Localize] Translation completed: uid=${uid}, documentId=${documentId}, target=${targetLocale}, duration=${duration}ms`);
-    return result;
+    return { result, sourceWasPublished: !!sourceEntry.publishedAt };
   },
   /**
    * Recursively translate an object's translatable fields

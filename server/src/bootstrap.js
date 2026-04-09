@@ -14,6 +14,9 @@ module.exports = async ({ strapi }) => {
   const processingSet = new Set();
   const QUEUE_PROCESS_INTERVAL = 5000; // Process queue every 5 seconds
 
+  // Flag to suppress lifecycle hooks triggered by the plugin's own writes
+  let isPluginWriting = false;
+
   // Track recent translations to prevent duplicates
   const recentTranslations = new Map();
   const DEBOUNCE_MS = 10000;
@@ -73,21 +76,44 @@ module.exports = async ({ strapi }) => {
 
       let successCount = 0;
       let failCount = 0;
+      let shouldPublish = false;
+      const successfulLocales = [];
 
-      for (const targetLocale of targetLocales) {
-        try {
-          await translationService.translateContent(
-            documentId,
-            uid,
-            targetLocale.code,
-            sourceLocale  // Always translate FROM the default/source locale
-          );
-          strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
-          successCount++;
-        } catch (error) {
-          strapi.log.error(`[Strapi Localize] Auto-translation failed: target=${targetLocale.code}, error=${error.message}`);
-          failCount++;
+      // Suppress lifecycle hooks during plugin writes
+      isPluginWriting = true;
+
+      try {
+        for (const targetLocale of targetLocales) {
+          try {
+            const { sourceWasPublished } = await translationService.translateContent(
+              documentId,
+              uid,
+              targetLocale.code,
+              sourceLocale  // Always translate FROM the default/source locale
+            );
+            strapi.log.info(`[Strapi Localize] Auto-translation successful: target=${targetLocale.code}`);
+            successCount++;
+            successfulLocales.push(targetLocale.code);
+            if (sourceWasPublished) shouldPublish = true;
+          } catch (error) {
+            strapi.log.error(`[Strapi Localize] Auto-translation failed: target=${targetLocale.code}, error=${error.message}`);
+            failCount++;
+          }
         }
+
+        // Publish all translated locales at once after all translations are done
+        if (shouldPublish && successfulLocales.length > 0) {
+          for (const locale of successfulLocales) {
+            try {
+              await strapi.documents(uid).publish({ documentId, locale });
+              strapi.log.info(`[Strapi Localize] Published locale: ${locale}`);
+            } catch (pubError) {
+              strapi.log.error(`[Strapi Localize] Failed to publish locale ${locale}: ${pubError.message}`);
+            }
+          }
+        }
+      } finally {
+        isPluginWriting = false;
       }
 
       strapi.log.info(`[Strapi Localize] Auto-translate completed: successful=${successCount}, failed=${failCount}`);
@@ -145,6 +171,11 @@ module.exports = async ({ strapi }) => {
    * Only triggers when the DEFAULT locale is edited
    */
   const scheduleTranslation = (event, hookType) => {
+    // Ignore lifecycle events triggered by the plugin's own writes (prevents cascade)
+    if (isPluginWriting) {
+      return;
+    }
+
     const { model, result } = event;
 
     if (!result || !result.documentId) {
