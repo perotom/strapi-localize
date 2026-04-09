@@ -1878,6 +1878,10 @@ var translation = ({ strapi }) => ({
         continue;
       }
       const fieldSchema = modelSchema?.attributes?.[key];
+      if (fieldSchema && modelSchema?.pluginOptions?.i18n?.localized === true && fieldSchema.pluginOptions?.i18n?.localized !== true && fieldSchema.type !== "dynamiczone" && fieldSchema.type !== "component") {
+        translated[key] = value;
+        continue;
+      }
       if (fieldSchema?.type === "blocks" && Array.isArray(value)) {
         translated[key] = await this.translateBlocks(deeplService, value, targetLang, sourceLang);
       } else if (this.shouldTranslateField(value, fieldSchema)) {

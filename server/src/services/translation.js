@@ -166,6 +166,15 @@ module.exports = ({ strapi }) => ({
       // Get field schema
       const fieldSchema = modelSchema?.attributes?.[key];
 
+      // Skip non-localized fields — they are shared across all locales in Strapi v5,
+      // so translating them would overwrite the value for every locale
+      if (fieldSchema && modelSchema?.pluginOptions?.i18n?.localized === true
+          && fieldSchema.pluginOptions?.i18n?.localized !== true
+          && fieldSchema.type !== 'dynamiczone' && fieldSchema.type !== 'component') {
+        translated[key] = value;
+        continue;
+      }
+
       // Handle different field types
       if (fieldSchema?.type === 'blocks' && Array.isArray(value)) {
         // Blocks-type content: structured JSON with nested text nodes
