@@ -1387,7 +1387,7 @@ var i18n = ({ strapi }) => ({
       }
       const cleanData = this.omitSystemFields(newEntryData);
       cleanData.publishedAt = null;
-      const createdEntry = await strapi.documents(uid).create({
+      const createdEntry = await strapi.documents(uid).update({
         documentId: sourceDocumentId,
         locale: targetLocale,
         data: cleanData

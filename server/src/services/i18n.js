@@ -83,9 +83,9 @@ module.exports = ({ strapi }) => ({
       // Set as draft (publishedAt: null)
       cleanData.publishedAt = null;
 
-      // Create the new localization using Documents API
-      // Pass documentId to link this localization to the existing document
-      const createdEntry = await strapi.documents(uid).create({
+      // Create locale variant using update() — in Strapi v5, calling update()
+      // with a locale that doesn't exist yet creates it under the same documentId
+      const createdEntry = await strapi.documents(uid).update({
         documentId: sourceDocumentId,
         locale: targetLocale,
         data: cleanData,
